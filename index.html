@@ -17,6 +17,9 @@
       --WN-ivory: #F5F7F0;
       --WN-border: #D2D8C5;
       --WN-obsidian-soft: #1C1F15;
+      --WN-topbar: #11130C;
+      --WN-sidebar: #11130C;
+      --WN-font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
     * {
@@ -38,8 +41,9 @@
       overflow: hidden;
       background-color: var(--WN-sage);
       color: var(--WN-obsidian);
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: var(--WN-font);
       -webkit-font-smoothing: antialiased;
+      text-rendering: geometricPrecision;
     }
 
     /* Infinite Canvas Surface */
@@ -86,7 +90,7 @@
       width: 1px;
       height: 1px;
       transform-origin: 0 0;
-      will-change: transform;
+      /* No will-change: transform or translate3d bitmap caching so browser re-rasterizes vector fonts & cards sharply at every zoom level */
     }
 
     /* Spatial Cards */
@@ -115,9 +119,9 @@
 
     /* Card Color Themes */
     .theme-ivory {
-      background-color: #F5F7F0;
-      border: 1px solid #D2D8C5;
-      color: #11130C;
+      background-color: var(--WN-ivory);
+      border: 1px solid var(--WN-border);
+      color: var(--WN-obsidian);
     }
     .theme-sage {
       background-color: #E2E7D5;
@@ -153,9 +157,134 @@
       z-index: 30;
       cursor: crosshair;
     }
-    .wn-card:hover .conn-port,
     #canvas-viewport.connecting-mode .conn-port {
-      opacity: 1;
+      opacity: 0.65;
+    }
+    .conn-handle {
+      cursor: grab;
+      transition: fill 0.12s ease, stroke-width 0.12s ease, stroke 0.12s ease;
+    }
+    .conn-handle:hover {
+      fill: #977ADC !important;
+      stroke: #11130C !important;
+      stroke-width: 2.5px !important;
+    }
+    .conn-handle:active {
+      cursor: grabbing;
+      fill: #CEBE7E !important;
+    }
+
+    /* 3D Tactile Sidebar Keycap & Extruded Icon System */
+    .dock-3d-badge {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(155deg, #2D3320 0%, #171A10 65%, #0F110A 100%);
+      border: 1px solid rgba(232, 236, 223, 0.18);
+      box-shadow:
+        0 4px 0 #070804,
+        0 6px 10px rgba(0, 0, 0, 0.65),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.22),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.14s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.14s ease;
+    }
+    .dock-btn:hover .dock-3d-badge {
+      transform: translateY(-2px);
+      border-color: rgba(206, 190, 126, 0.55);
+      box-shadow:
+        0 6px 0 #070804,
+        0 10px 16px rgba(0, 0, 0, 0.75),
+        0 0 12px rgba(151, 122, 220, 0.28),
+        inset 0 1.5px 1.5px rgba(255, 255, 255, 0.35),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.5);
+    }
+    .dock-btn:active .dock-3d-badge {
+      transform: translateY(2px);
+      box-shadow:
+        0 1px 0 #070804,
+        0 2px 4px rgba(0, 0, 0, 0.6),
+        inset 0 1px 2px rgba(0, 0, 0, 0.6);
+    }
+
+    /* 3D Top Bar & Sidebar Surfaces */
+    .topbar-3d-surface {
+      background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.22) 100%), var(--WN-topbar);
+      box-shadow:
+        0 4px 0 #060704,
+        0 8px 18px rgba(0, 0, 0, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    }
+    .sidebar-3d-surface {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%), var(--WN-sidebar);
+      box-shadow:
+        4px 0 0 #060704,
+        8px 0 18px rgba(0, 0, 0, 0.38),
+        inset 1px 0 0 rgba(255, 255, 255, 0.1);
+    }
+
+    /* 3D Floating On-Background Legend Decks (Bottom-Left Mode Bar, Minimap Radar, Zoom Deck) */
+    .panel-3d-deck {
+      background: linear-gradient(165deg, #252A1B 0%, #14170E 65%, #0D0F09 100%);
+      border: 1px solid rgba(232, 236, 223, 0.2);
+      border-radius: 14px;
+      box-shadow:
+        0 5px 0 #060704,
+        0 10px 22px rgba(0, 0, 0, 0.55),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.2),
+        inset 0 -2px 3px rgba(0, 0, 0, 0.6);
+    }
+
+    /* 3D Tactile Keycap Buttons for Top Bar & On-Background Legends */
+    .btn-3d-key {
+      position: relative;
+      background: linear-gradient(160deg, #2E3421 0%, #181C11 70%, #10130B 100%);
+      color: var(--WN-sage);
+      border: 1px solid rgba(232, 236, 223, 0.16);
+      border-radius: 9px;
+      box-shadow:
+        0 3px 0 #050603,
+        0 4px 7px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.22);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .btn-3d-key:hover {
+      transform: translateY(-1.5px);
+      border-color: var(--WN-gold);
+      box-shadow:
+        0 4.5px 0 #050603,
+        0 7px 12px rgba(0, 0, 0, 0.6),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.32);
+    }
+    .btn-3d-key:active {
+      transform: translateY(1.5px);
+      box-shadow:
+        0 1px 0 #050603,
+        0 2px 3px rgba(0, 0, 0, 0.5),
+        inset 0 1px 2px rgba(0, 0, 0, 0.55);
+    }
+    .btn-3d-key-active {
+      background: linear-gradient(160deg, var(--WN-amethyst) 0%, #7B5DC4 100%) !important;
+      color: #11130C !important;
+      font-weight: 700 !important;
+      border-color: rgba(255, 255, 255, 0.45) !important;
+      box-shadow:
+        0 3px 0 #3D2970,
+        0 5px 10px rgba(151, 122, 220, 0.4),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.45) !important;
+    }
+    .btn-3d-gold {
+      background: linear-gradient(160deg, #DFD092 0%, var(--WN-gold) 65%, #A69552 100%) !important;
+      color: #11130C !important;
+      font-weight: 700 !important;
+      border-color: rgba(255, 255, 255, 0.45) !important;
+      box-shadow:
+        0 3px 0 #574D24,
+        0 5px 10px rgba(0, 0, 0, 0.45),
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.5) !important;
     }
     .conn-port:hover {
       background-color: var(--WN-amethyst);
@@ -261,32 +390,33 @@
 </head>
 <body class="flex flex-col h-screen w-screen overflow-hidden select-none">
 
-  <!-- TOP NAVIGATION, LOGO, BREADCRUMBS & CONTEXTUAL TOOLBAR -->
-  <header class="h-14 bg-[#11130C] text-[#E8ECDF] border-b border-[#282C1E] px-3 flex items-center justify-between z-40 shrink-0 shadow-md">
-    <!-- Left: Custom Creative Willnote Logo + Breadcrumb Navigation -->
+  <!-- TOP NAVIGATION, LOGO, BREADCRUMBS & CONTEXTUAL TOOLBAR (3D SCULPTED DECK) -->
+  <header class="topbar-3d-surface h-16 text-[#E8ECDF] border-b border-[#282C1E] px-3.5 flex items-center justify-between z-40 shrink-0">
+    <!-- Left: Custom Creative 3D Willnote Logo + Breadcrumb Navigation -->
     <div class="flex items-center gap-3 min-w-0">
       <button id="btn-home-logo" onclick="navigateToBoard('root')" class="flex items-center gap-2.5 group focus:outline-none" title="Return to Main Workspace Board">
-        <!-- Custom Creative Willnote Inline SVG Logo -->
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0 transition-transform duration-200 group-hover:scale-105">
-          <rect x="1" y="1" width="38" height="38" rx="10" fill="#181B11" stroke="#CEBE7E" stroke-width="1.5"/>
-          <!-- Back spatial card in Antique Gold -->
-          <rect x="7" y="9" width="13" height="17" rx="3.5" transform="rotate(-8 7 9)" fill="#CEBE7E"/>
-          <!-- Front spatial card in Alabaster Sage -->
-          <rect x="19" y="12" width="13" height="17" rx="3.5" transform="rotate(6 19 12)" fill="#E8ECDF"/>
-          <!-- Geometric W & Bezier Connector Path in Amethyst -->
-          <path d="M9.5 14.5L13 26.5L19.5 17.5L25.5 26.5L30.5 13.5" stroke="#11130C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M9.5 14.5L13 26.5L19.5 17.5L25.5 26.5L30.5 13.5" stroke="#977ADC" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- Glowing Amethyst Node Spark -->
-          <circle cx="30.5" cy="13.5" r="3.2" fill="#977ADC" stroke="#E8ECDF" stroke-width="1.2"/>
-          <circle cx="9.5" cy="14.5" r="2.3" fill="#CEBE7E"/>
-        </svg>
+        <div class="dock-3d-badge !w-10 !h-10">
+          <!-- Custom Creative Willnote Inline 3D SVG Logo -->
+          <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0">
+            <!-- Back spatial card in Secondary Accent -->
+            <rect x="6" y="7" width="14" height="19" rx="3.5" transform="rotate(-8 6 7)" fill="var(--WN-gold)"/>
+            <!-- Front spatial card in Canvas Surface -->
+            <rect x="19" y="10" width="14" height="19" rx="3.5" transform="rotate(6 19 10)" fill="var(--WN-sage)"/>
+            <!-- Geometric W & Bezier Connector Path in Primary Accent -->
+            <path d="M8.5 14.5L12.5 27.5L19.5 17.5L26 27.5L31.5 12.5" stroke="#11130C" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 14.5L12.5 27.5L19.5 17.5L26 27.5L31.5 12.5" stroke="var(--WN-amethyst)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Glowing Node Spark -->
+            <circle cx="31.5" cy="12.5" r="3.6" fill="var(--WN-amethyst)" stroke="#F5F7F0" stroke-width="1.3"/>
+            <circle cx="8.5" cy="14.5" r="2.6" fill="var(--WN-gold)"/>
+          </svg>
+        </div>
         <div class="flex flex-col text-left">
           <div class="flex items-center gap-1.5">
-            <span class="font-bold tracking-tight text-base text-[#E8ECDF] leading-none">Willnote</span>
-            <span class="w-1.5 h-1.5 rounded-full bg-[#977ADC]"></span>
-            <span class="text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-[#23271A] text-[#CEBE7E] border border-[#CEBE7E]/30">Unlimited</span>
+            <span class="font-extrabold tracking-tight text-base text-[#E8ECDF] leading-none drop-shadow">Willnote</span>
+            <span class="w-1.5 h-1.5 rounded-full" style="background:var(--WN-amethyst)"></span>
+            <span class="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-[#181B11] border border-white/15 shadow-inner" style="color:var(--WN-gold)">Unlimited</span>
           </div>
-          <span class="text-[10px] text-[#E8ECDF]/60 leading-tight mt-0.5 hidden sm:inline">Personal Spatial Studio</span>
+          <span class="text-[10px] text-[#E8ECDF]/65 leading-tight mt-0.5 hidden sm:inline">3D Personal Spatial Studio</span>
         </div>
       </button>
 
@@ -312,11 +442,18 @@
 
       <!-- Connector Controls (Shown when a connector is selected) -->
       <div id="connector-style-controls" class="hidden items-center gap-1.5 border-r border-[#2D3223] pr-2 mr-1">
-        <button onclick="setSelectedConnectorColor('#977ADC')" class="w-4 h-4 rounded-full bg-[#977ADC] border border-white/40" title="Amethyst Line"></button>
-        <button onclick="setSelectedConnectorColor('#CEBE7E')" class="w-4 h-4 rounded-full bg-[#CEBE7E] border border-white/40" title="Antique Gold Line"></button>
-        <button onclick="setSelectedConnectorColor('#11130C')" class="w-4 h-4 rounded-full bg-[#11130C] border border-[#E8ECDF]" title="Obsidian Line"></button>
-        <button onclick="toggleSelectedConnectorDash()" class="px-1.5 py-0.5 text-[11px] rounded bg-[#282C1E] hover:bg-[#977ADC] hover:text-[#11130C] transition" title="Toggle Solid / Animated Dashed Line">Dash</button>
-        <button onclick="toggleSelectedConnectorCurve()" class="px-1.5 py-0.5 text-[11px] rounded bg-[#282C1E] hover:bg-[#977ADC] hover:text-[#11130C] transition" title="Toggle Bezier Curve / Straight Line">Curve</button>
+        <button onclick="setSelectedConnectorColor('#11130C')" class="w-4 h-4 rounded-full bg-[#11130C] border border-[#E8ECDF]" title="Obsidian Line (#11130C)"></button>
+        <button onclick="setSelectedConnectorColor('#977ADC')" class="w-4 h-4 rounded-full bg-[#977ADC] border border-white/40" title="Amethyst Line (#977ADC)"></button>
+        <button onclick="setSelectedConnectorColor('#CEBE7E')" class="w-4 h-4 rounded-full bg-[#CEBE7E] border border-white/40" title="Antique Gold Line (#CEBE7E)"></button>
+        <button onclick="toggleSelectedConnectorLabel()" class="px-2 py-0.5 text-[11px] rounded bg-[#282C1E] text-[#CEBE7E] hover:bg-[#977ADC] hover:text-[#11130C] font-semibold transition" title="Show or Hide Label on Arrow">Label</button>
+        <button onclick="toggleSelectedConnectorDash()" class="px-1.5 py-0.5 text-[11px] rounded bg-[#282C1E] hover:bg-[#977ADC] hover:text-[#11130C] transition" title="Toggle Solid / Dashed Arrow">Dash</button>
+        <button onclick="resetSelectedConnectorArch()" class="px-1.5 py-0.5 text-[11px] rounded bg-[#282C1E] hover:bg-[#977ADC] hover:text-[#11130C] transition" title="Reset Arch to Straight Line">Curve</button>
+      </div>
+
+      <!-- Note Header / Footer Toggle Controls (Shown when a Note card is selected) -->
+      <div id="note-extra-controls" class="hidden items-center gap-1 border-r border-[#2D3223] pr-2 mr-1">
+        <button onclick="toggleSelectedNotesHeader()" class="px-2 py-1 text-xs rounded bg-[#25291C] hover:bg-[#977ADC] hover:text-[#11130C] transition" title="Toggle Optional Header on Selected Note(s)">+ Header</button>
+        <button onclick="toggleSelectedNotesFooter()" class="px-2 py-1 text-xs rounded bg-[#25291C] hover:bg-[#CEBE7E] hover:text-[#11130C] transition" title="Toggle Optional Footer on Selected Note(s)">+ Footer</button>
       </div>
 
       <button id="btn-toggle-img-desc" onclick="toggleSelectedImagesDescription()" class="hidden px-2 py-1 text-xs rounded bg-[#25291C] hover:bg-[#977ADC] hover:text-[#11130C] transition items-center gap-1" title="Show or Hide Title & Description Under Selected Image(s)">
@@ -331,45 +468,56 @@
       <button onclick="deleteSelectedItems()" class="px-2 py-1 text-xs rounded bg-red-950/70 text-red-200 hover:bg-red-600 hover:text-white transition" title="Move Selected to Trash (Del)">Delete</button>
     </div>
 
-    <!-- Right: Global Search, Undo/Redo, Templates, Cloud Sync, Export, Unsorted Inbox -->
-    <div class="flex items-center gap-1.5">
-      <!-- Undo / Redo -->
-      <div class="hidden md:flex items-center bg-[#1A1D12] border border-[#2D3223] rounded-lg p-0.5">
-        <button id="btn-undo" onclick="undoAction()" class="p-1.5 rounded hover:bg-[#282C1E] text-[#E8ECDF]/80 hover:text-[#E8ECDF] disabled:opacity-30 transition" title="Undo (Ctrl+Z)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+    <!-- Right: 3D Tactile Keycaps for Undo/Redo, Search, Theme Studio, Templates, Cloud Sync, Export, Inbox -->
+    <div class="flex items-center gap-2">
+      <!-- Undo / Redo 3D Keycaps -->
+      <div class="hidden md:flex items-center gap-1">
+        <button id="btn-undo" onclick="undoAction()" class="btn-3d-key p-1.5 disabled:opacity-35" title="Undo (Ctrl+Z)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
         </button>
-        <button id="btn-redo" onclick="redoAction()" class="p-1.5 rounded hover:bg-[#282C1E] text-[#E8ECDF]/80 hover:text-[#E8ECDF] disabled:opacity-30 transition" title="Redo (Ctrl+Y)">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"/></svg>
+        <button id="btn-redo" onclick="redoAction()" class="btn-3d-key p-1.5 disabled:opacity-35" title="Redo (Ctrl+Y)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"/></svg>
         </button>
       </div>
 
-      <!-- Global Search (Ctrl+K) -->
-      <button onclick="openSearchModal()" class="flex items-center gap-2 bg-[#1A1D12] hover:bg-[#25291C] border border-[#2D3223] px-2.5 py-1.5 rounded-lg text-xs text-[#E8ECDF]/80 hover:text-[#E8ECDF] transition" title="Search All Boards & Cards (Ctrl+K)">
-        <svg class="w-3.5 h-3.5 text-[#977ADC]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        <span class="hidden lg:inline">Search</span>
-        <kbd class="hidden sm:inline text-[10px] px-1 py-0.5 bg-[#11130C] text-[#CEBE7E] rounded border border-[#2D3223]">⌘K</kbd>
+      <!-- Global Search (Ctrl+K) 3D Keycap -->
+      <button onclick="openSearchModal()" class="btn-3d-key flex items-center gap-1.5 px-2.5 py-1.5 text-xs" title="Search All Boards & Cards (Ctrl+K)">
+        <svg class="w-3.5 h-3.5" style="color:var(--WN-amethyst)" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <span class="hidden lg:inline font-medium">Search</span>
+        <kbd class="hidden sm:inline text-[10px] px-1 py-0.2 bg-black/40 rounded border border-white/10" style="color:var(--WN-gold)">⌘K</kbd>
       </button>
 
-      <!-- Board Templates -->
-      <button onclick="openTemplatesModal()" class="flex items-center gap-1.5 bg-[#1A1D12] hover:bg-[#25291C] border border-[#2D3223] px-2.5 py-1.5 rounded-lg text-xs text-[#CEBE7E] transition" title="Load or Add Board Templates">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
-        <span class="hidden md:inline font-medium">Templates</span>
+      <!-- Theme & Appearance Studio 3D Keycap -->
+      <button id="btn-appearance" onclick="openAppearanceModal()" class="btn-3d-key flex items-center gap-1.5 px-2.5 py-1.5 text-xs" title="Customize App Color Scheme, Icon Colors, Fonts, Background, Sidebar & Top Bar">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" fill="var(--WN-amethyst)" stroke="#F5F7F0" stroke-width="1.4"/>
+          <circle cx="9" cy="10" r="2" fill="var(--WN-gold)"/>
+          <circle cx="14.5" cy="9.5" r="1.8" fill="var(--WN-sage)"/>
+          <circle cx="13" cy="14.8" r="2" fill="#11130C"/>
+        </svg>
+        <span class="hidden md:inline font-semibold" style="color:var(--WN-sage)">Theme</span>
       </button>
 
-      <!-- Firebase Cloud Sync & Deploy Button -->
-      <button id="btn-cloud-sync" onclick="openFirebaseModal()" class="flex items-center gap-1.5 bg-[#977ADC]/20 hover:bg-[#977ADC]/30 border border-[#977ADC]/50 px-2.5 py-1.5 rounded-lg text-xs text-[#E8ECDF] transition" title="Configure Firebase Cloud Sync & Hosting">
-        <span id="sync-status-dot" class="w-2 h-2 rounded-full bg-[#CEBE7E]"></span>
-        <span id="sync-status-text" class="font-medium hidden sm:inline">Local Saved</span>
+      <!-- Board Templates 3D Keycap -->
+      <button onclick="openTemplatesModal()" class="btn-3d-key flex items-center gap-1.5 px-2.5 py-1.5 text-xs" style="color:var(--WN-gold)" title="Load or Add Board Templates">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+        <span class="hidden md:inline font-semibold">Templates</span>
       </button>
 
-      <!-- Backup & Export -->
-      <button onclick="openExportModal()" class="p-1.5 bg-[#1A1D12] hover:bg-[#25291C] border border-[#2D3223] rounded-lg text-[#E8ECDF]/80 hover:text-[#CEBE7E] transition" title="Export / Import Workspace (.json / .md)">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      <!-- Firebase Cloud Sync & Deploy 3D Keycap -->
+      <button id="btn-cloud-sync" onclick="openFirebaseModal()" class="btn-3d-key flex items-center gap-1.5 px-2.5 py-1.5 text-xs" title="Configure Firebase Cloud Sync & Hosting">
+        <span id="sync-status-dot" class="w-2.5 h-2.5 rounded-full shadow-sm" style="background:var(--WN-gold)"></span>
+        <span id="sync-status-text" class="font-semibold hidden sm:inline">Local Saved</span>
       </button>
 
-      <!-- Unsorted Quick-Capture Inbox Drawer Toggle -->
-      <button onclick="toggleUnsortedDrawer()" class="relative flex items-center gap-1.5 bg-[#CEBE7E] hover:bg-[#d8c98e] text-[#11130C] font-semibold px-2.5 py-1.5 rounded-lg text-xs transition shadow-sm" title="Toggle Quick-Capture Inbox Drawer">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+      <!-- Backup & Export 3D Keycap -->
+      <button onclick="openExportModal()" class="btn-3d-key p-1.5" title="Export / Import Workspace (.json / .md)">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      </button>
+
+      <!-- Unsorted Quick-Capture Inbox Drawer 3D Gold Keycap -->
+      <button onclick="toggleUnsortedDrawer()" class="btn-3d-key btn-3d-gold relative flex items-center gap-1.5 px-2.5 py-1.5 text-xs" title="Toggle Quick-Capture Inbox Drawer">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
         <span class="hidden sm:inline">Inbox</span>
         <span id="unsorted-count-badge" class="px-1.5 py-0.2 bg-[#11130C] text-[#E8ECDF] rounded-full text-[10px] font-bold">2</span>
       </button>
@@ -379,92 +527,202 @@
   <!-- MAIN WORKSPACE BODY: LEFT CREATION DOCK + INFINITE CANVAS + SLIDE-OUT DRAWERS -->
   <div class="relative flex-1 flex overflow-hidden">
 
-    <!-- LEFT MILANOTE-STYLE DRAG & CLICK CREATION DOCK (#11130C) -->
-    <aside class="w-16 bg-[#11130C] text-[#E8ECDF] border-r border-[#282C1E] flex flex-col items-center py-2.5 justify-between z-30 shrink-0 shadow-xl overflow-y-auto no-scrollbar">
-      <div class="flex flex-col items-center gap-1.5 w-full px-1.5">
-        <div class="text-[9px] uppercase tracking-wider text-[#CEBE7E]/70 font-semibold mb-0.5">Drag/Click</div>
+    <!-- LEFT MILANOTE-STYLE DRAG & CLICK CREATION DOCK WITH 3D SCULPTED ICONS (#11130C) -->
+    <aside class="sidebar-3d-surface w-16 text-[#E8ECDF] border-r border-[#282C1E] flex flex-col items-center py-2.5 justify-between z-30 shrink-0 overflow-y-auto no-scrollbar">
+      <div class="flex flex-col items-center gap-2 w-full px-1.5">
+        <div class="text-[9px] uppercase tracking-wider text-[#CEBE7E]/80 font-bold mb-0.5">Drag/Click</div>
 
-        <!-- Sub-Board Tool -->
-        <button draggable="true" ondragstart="onDockDragStart(event, 'board')" onclick="createCardFromDock('board')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag onto canvas or click to add a Nested Sub-Board">
-          <div class="w-7 h-7 rounded-lg bg-[#977ADC]/20 border border-[#977ADC]/50 flex items-center justify-center text-[#977ADC]">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+        <!-- 1. Sub-Board Tool (3D Layered Isometric Folder) -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'board')" onclick="createCardFromDock('board')" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]" title="Drag onto canvas or click to add a Nested Sub-Board">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Cast drop shadow -->
+              <rect x="4" y="9" width="20" height="15" rx="3" fill="#070804" opacity="0.65"/>
+              <!-- Back folder plane -->
+              <path d="M4 7.5C4 6.12 5.12 5 6.5 5H11.2L13.4 7.4H21.5C22.88 7.4 24 8.52 24 9.9V20C24 21.38 22.88 22.5 21.5 22.5H6.5C5.12 22.5 4 21.38 4 20V7.5Z" fill="#684CB0"/>
+              <!-- Middle 3D paper sheet sticking out -->
+              <rect x="6.5" y="7.5" width="15" height="11" rx="2" transform="rotate(-3 6.5 7.5)" fill="#E8ECDF" stroke="var(--WN-gold)" stroke-width="0.8"/>
+              <!-- Front angled 3D folder pocket with top highlight -->
+              <path d="M3.5 11.5C3.5 10.4 4.4 9.5 5.5 9.5H22.5C23.6 9.5 24.5 10.4 24.3 11.5L23.1 20.8C22.95 21.8 22.1 22.5 21.1 22.5H6.9C5.9 22.5 5.05 21.8 4.9 20.8L3.5 11.5Z" fill="var(--WN-amethyst)"/>
+              <path d="M4.2 10.3H23.8" stroke="#E8ECDF" stroke-width="1.2" stroke-linecap="round" opacity="0.7"/>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">Board</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">Board</span>
         </button>
 
-        <!-- Note Card Tool -->
-        <button draggable="true" ondragstart="onDockDragStart(event, 'note')" onclick="createCardFromDock('note')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Rich Note Card">
-          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#E8ECDF]">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <!-- 2. Note Card Tool (3D Extruded Page Block with Folded Dog-Ear & Shadow) -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'note')" onclick="createCardFromDock('note')" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]" title="Drag or click to add a Plain Note Card">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- 3D bottom/right extruded thickness block -->
+              <path d="M7.5 6.5H18.5L22.5 10.5V23C22.5 24.1 21.6 25 20.5 25H7.5C6.4 25 5.5 24.1 5.5 23V8.5C5.5 7.4 6.4 6.5 7.5 6.5Z" fill="#8E967F"/>
+              <!-- Top lit paper face -->
+              <path d="M6.5 4.5H17.2L21.5 8.8V21C21.5 22.1 20.6 23 19.5 23H6.5C5.4 23 4.5 22.1 4.5 21V6.5C4.5 5.4 5.4 4.5 6.5 4.5Z" fill="#F5F7F0"/>
+              <!-- 3D Dog-ear shadow & flap -->
+              <path d="M17.2 8.8L21.5 11.2V8.8H17.2Z" fill="#B5BDA5"/>
+              <path d="M17.2 4.5V8.8H21.5L17.2 4.5Z" fill="var(--WN-gold)"/>
+              <!-- Embossed text bars -->
+              <rect x="7.5" y="10" width="7" height="2" rx="1" fill="var(--WN-amethyst)"/>
+              <rect x="7.5" y="13.8" width="11" height="1.8" rx="0.9" fill="#11130C" opacity="0.75"/>
+              <rect x="7.5" y="17.2" width="8.5" height="1.8" rx="0.9" fill="#11130C" opacity="0.5"/>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">Note</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">Note</span>
         </button>
 
-        <!-- To-Do Checklist Tool -->
-        <button draggable="true" ondragstart="onDockDragStart(event, 'todo')" onclick="createCardFromDock('todo')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add an Interactive To-Do List">
-          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#CEBE7E]">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <!-- 3. To-Do Checklist Tool (3D Bevelled Clipboard & Raised Check Badge) -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'todo')" onclick="createCardFromDock('todo')" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]" title="Drag or click to add an Interactive To-Do List">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Extruded 3D clipboard base -->
+              <rect x="6" y="7" width="16" height="18" rx="3" fill="#7D703B"/>
+              <rect x="5" y="5.5" width="16" height="17.5" rx="3" fill="var(--WN-gold)"/>
+              <!-- Inner recessed paper -->
+              <rect x="7" y="8" width="12" height="13" rx="1.8" fill="#F5F7F0"/>
+              <!-- 3D Metallic clip at top -->
+              <rect x="9.5" y="3.5" width="7" height="3.8" rx="1.5" fill="var(--WN-amethyst)" stroke="#E8ECDF" stroke-width="0.9"/>
+              <!-- Floating 3D Checkmark Pill -->
+              <circle cx="18.5" cy="18.5" r="5" fill="#11130C"/>
+              <circle cx="18" cy="17.8" r="4.8" fill="var(--WN-amethyst)" stroke="#F5F7F0" stroke-width="1"/>
+              <path d="M15.8 17.8L17.3 19.3L20.3 16.3" stroke="#11130C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <!-- Task lines -->
+              <rect x="8.8" y="10.5" width="6.5" height="1.6" rx="0.8" fill="#11130C" opacity="0.7"/>
+              <rect x="8.8" y="13.8" width="5" height="1.6" rx="0.8" fill="#11130C" opacity="0.45"/>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">To-Do</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">To-Do</span>
         </button>
 
-        <!-- Column Container Tool -->
-        <button draggable="true" ondragstart="onDockDragStart(event, 'column')" onclick="createCardFromDock('column')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Vertical Column Container">
-          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#E8ECDF]">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        <!-- 4. Column Container Tool (3D Isometric Stacked Cards/Blocks) -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'column')" onclick="createCardFromDock('column')" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]" title="Drag or click to add a Vertical Column Container">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Tier 3 (Bottom 3D Block) -->
+              <rect x="5.5" y="19.5" width="17" height="5" rx="1.6" fill="#684CB0"/>
+              <rect x="4.5" y="18" width="17" height="4.8" rx="1.6" fill="var(--WN-amethyst)" stroke="#E8ECDF" stroke-width="0.6"/>
+              <!-- Tier 2 (Middle 3D Block) -->
+              <rect x="5.5" y="13" width="17" height="5" rx="1.6" fill="#8F8148"/>
+              <rect x="4.5" y="11.5" width="17" height="4.8" rx="1.6" fill="var(--WN-gold)" stroke="#F5F7F0" stroke-width="0.6"/>
+              <!-- Tier 1 (Top 3D Block) -->
+              <rect x="5.5" y="6.5" width="17" height="5" rx="1.6" fill="#9BA38B"/>
+              <rect x="4.5" y="5" width="17" height="4.8" rx="1.6" fill="#F5F7F0"/>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">Column</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">Column</span>
         </button>
 
-        <!-- Image / Media Card Tool -->
-        <button draggable="true" ondragstart="onDockDragStart(event, 'image')" onclick="createCardFromDock('image')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add an Image / Visual Card">
-          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#977ADC]">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <!-- 5. Image / Media Card Tool (3D Framed Relief with Layered Mountains & Orb) -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'image')" onclick="createCardFromDock('image')" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]" title="Drag or click to add an Image / Visual Card">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- 3D Extruded Frame Back -->
+              <rect x="5.5" y="6.5" width="18" height="17" rx="3.2" fill="#8C947C"/>
+              <!-- Lit Frame Face -->
+              <rect x="4.5" y="5" width="18" height="16.5" rx="3.2" fill="#F5F7F0"/>
+              <!-- Dark Recessed Canvas -->
+              <rect x="6.3" y="6.8" width="14.4" height="12.8" rx="2" fill="#181B11"/>
+              <!-- Glowing 3D Gold Sun Sphere -->
+              <circle cx="17.2" cy="10.2" r="2.2" fill="var(--WN-gold)"/>
+              <circle cx="16.8" cy="9.8" r="0.8" fill="#F5F7F0"/>
+              <!-- Back 3D Mountain -->
+              <path d="M11.5 19.6L16.2 12.8L20.7 19.6H11.5Z" fill="#684CB0"/>
+              <!-- Front Lit 3D Mountain -->
+              <path d="M6.3 19.6L11.4 11.8L16.5 19.6H6.3Z" fill="var(--WN-amethyst)"/>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">Image</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">Image</span>
         </button>
 
-        <!-- Link / Bookmark Tool -->
-        <button draggable="true" ondragstart="onDockDragStart(event, 'link')" onclick="createCardFromDock('link')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Web Bookmark Card">
-          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#CEBE7E]">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+        <!-- 6. Link / Bookmark Tool (3D Interlocking Extruded Chain Torus) -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'link')" onclick="createCardFromDock('link')" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]" title="Drag or click to add a Web Bookmark Card">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Drop shadow -->
+              <path d="M11.5 17.5L17.5 11.5" stroke="#070804" stroke-width="5" stroke-linecap="round"/>
+              <!-- Bottom Link (Amethyst 3D tube) -->
+              <rect x="6.2" y="13.5" width="10" height="6.4" rx="3.2" transform="rotate(-45 6.2 13.5)" stroke="#684CB0" stroke-width="3.4"/>
+              <rect x="5.5" y="12.8" width="10" height="6.4" rx="3.2" transform="rotate(-45 5.5 12.8)" stroke="var(--WN-amethyst)" stroke-width="2.4"/>
+              <!-- Top Link (Gold 3D tube) -->
+              <rect x="12.5" y="7.2" width="10" height="6.4" rx="3.2" transform="rotate(-45 12.5 7.2)" stroke="#8A7B3E" stroke-width="3.4"/>
+              <rect x="11.8" y="6.5" width="10" height="6.4" rx="3.2" transform="rotate(-45 11.8 6.5)" stroke="var(--WN-gold)" stroke-width="2.4"/>
+              <!-- Center 3D Bridge Pin -->
+              <path d="M11.5 16.5L16.5 11.5" stroke="#F5F7F0" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">Link</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">Link</span>
         </button>
 
-        <!-- Color Swatch Tool -->
-        <button draggable="true" ondragstart="onDockDragStart(event, 'swatch')" onclick="createCardFromDock('swatch')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Moodboard Color Swatch">
-          <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-[#CEBE7E] to-[#977ADC] p-0.5 flex items-center justify-center">
-            <div class="w-full h-full bg-[#11130C]/40 rounded-[6px] flex items-center justify-center text-white">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
-            </div>
+        <!-- 7. Color Swatch Tool (3D Isometric Multi-Face Color Cube) -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'swatch')" onclick="createCardFromDock('swatch')" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]" title="Drag or click to add a Moodboard Color Swatch">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Top Isometric Diamond (#E8ECDF Alabaster Sage) -->
+              <path d="M14 4.5L23 9.7L14 14.9L5 9.7L14 4.5Z" fill="#E8ECDF"/>
+              <!-- Left Isometric Face (#CEBE7E Antique Gold) -->
+              <path d="M5 9.7L14 14.9V24.5L5 19.3V9.7Z" fill="var(--WN-gold)"/>
+              <!-- Right Isometric Face (#977ADC Amethyst Lavender) -->
+              <path d="M23 9.7L14 14.9V24.5L23 19.3V9.7Z" fill="var(--WN-amethyst)"/>
+              <!-- Crisp 3D specular edge highlights -->
+              <path d="M5 9.7L14 14.9L23 9.7M14 14.9V24.5" stroke="#11130C" stroke-width="1.1" stroke-linejoin="round"/>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">Swatch</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">Swatch</span>
         </button>
 
-        <!-- Section Header Tool -->
-        <button draggable="true" ondragstart="onDockDragStart(event, 'header')" onclick="createCardFromDock('header')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Canvas Section Header">
-          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center font-bold text-xs text-[#E8ECDF]">
-            H1
+        <!-- 8. Section Header Tool (3D Extruded Block Typography) -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'header')" onclick="createCardFromDock('header')" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]" title="Drag or click to add a Canvas Section Header">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- 3D Extruded Back Block -->
+              <rect x="5.5" y="7" width="18" height="15" rx="3" fill="#684CB0"/>
+              <!-- Front Key Plate -->
+              <rect x="4.5" y="5.5" width="18" height="14.5" rx="3" fill="#1F2416" stroke="var(--WN-gold)" stroke-width="1.2"/>
+              <!-- 3D Extruded Plate Under-Bar -->
+              <rect x="7.5" y="16.2" width="13" height="2" rx="1" fill="var(--WN-amethyst)"/>
+              <!-- Front Lit 3D Text -->
+              <text x="7.5" y="15.2" fill="#F5F7F0" stroke="#11130C" stroke-width="0.4" font-family="Inter, sans-serif" font-weight="900" font-size="10.5">H1</text>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">Header</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">Header</span>
         </button>
 
-        <!-- Connector Line Tool -->
-        <button id="btn-dock-connect" onclick="toggleConnectMode()" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF] border border-transparent" title="Toggle Arrow Connector Mode (or drag any card's purple side port)">
-          <div class="w-7 h-7 rounded-lg bg-[#977ADC]/20 border border-[#977ADC]/50 flex items-center justify-center text-[#977ADC]">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        <!-- 9. Connector Arrow Tool (3D Curved Tube with Spherical Nodes) -->
+        <button id="btn-dock-connect" draggable="true" ondragstart="onDockDragStart(event, 'arrow')" onclick="toggleConnectMode()" class="dock-btn w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF] border border-transparent" title="Drag onto canvas to spawn a freeform Arrow, or click to draw an Arrow between cards">
+          <div class="dock-3d-badge">
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- 3D Tube Drop Shadow -->
+              <path d="M6.5 21.5C8.5 12.5 14.5 9.5 21.5 8.5" stroke="#070804" stroke-width="4.2" stroke-linecap="round"/>
+              <!-- 3D Lit Amethyst Curve -->
+              <path d="M6 20C8 11 14 8 21 7" stroke="var(--WN-amethyst)" stroke-width="2.8" stroke-linecap="round"/>
+              <!-- 3D Arrowhead Tip -->
+              <path d="M17.5 4.2L23 6.8L18.8 11.2L17.5 4.2Z" fill="var(--WN-gold)" stroke="#11130C" stroke-width="0.8" stroke-linejoin="round"/>
+              <!-- 3D Start Sphere & Arch Sphere -->
+              <circle cx="6.2" cy="20.2" r="3" fill="#F5F7F0" stroke="#11130C" stroke-width="1.2"/>
+              <circle cx="12.2" cy="11.2" r="2.4" fill="var(--WN-amethyst)" stroke="#F5F7F0" stroke-width="1"/>
+            </svg>
           </div>
-          <span class="text-[10px] font-medium leading-none">Line</span>
+          <span class="text-[10px] font-semibold leading-none tracking-tight">Line</span>
         </button>
       </div>
 
-      <!-- Bottom: Trash Drawer Trigger -->
+      <!-- Bottom: Trash Drawer Trigger (3D Sculpted Cylinder Bin) -->
       <div class="flex flex-col items-center gap-2 w-full px-1.5 pt-2 border-t border-[#282C1E]">
-        <button onclick="openTrashModal()" class="dock-btn relative w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]/70 hover:text-[#CEBE7E]" title="View Trash & Restore Deleted Items">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          <span class="text-[10px] font-medium leading-none">Trash</span>
-          <span id="trash-count-badge" class="hidden absolute top-1 right-2 w-4 h-4 rounded-full bg-[#977ADC] text-[#11130C] text-[9px] font-bold items-center justify-center">0</span>
+        <button onclick="openTrashModal()" class="dock-btn relative w-full py-1.5 rounded-xl flex flex-col items-center gap-1.5 text-[#E8ECDF]/80 hover:text-[#CEBE7E]" title="View Trash & Restore Deleted Items">
+          <div class="dock-3d-badge">
+            <svg width="22" height="22" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- 3D Bin Body -->
+              <path d="M7.5 9.5H20.5L19.2 22.5C19.1 23.6 18.2 24.4 17.1 24.4H10.9C9.8 24.4 8.9 23.6 8.8 22.5L7.5 9.5Z" fill="#8E967F"/>
+              <path d="M7.5 9.5H16.5L15.6 24.4H10.9C9.8 24.4 8.9 23.6 8.8 22.5L7.5 9.5Z" fill="#E8ECDF"/>
+              <!-- 3D Recessed Flutes -->
+              <rect x="11" y="12.5" width="1.6" height="8.5" rx="0.8" fill="#11130C" opacity="0.65"/>
+              <rect x="15.4" y="12.5" width="1.6" height="8.5" rx="0.8" fill="#11130C" opacity="0.65"/>
+              <!-- 3D Extruded Lid -->
+              <rect x="5.5" y="6.5" width="17" height="3.2" rx="1.5" fill="var(--WN-gold)" stroke="#11130C" stroke-width="0.8"/>
+              <rect x="11" y="4.2" width="6" height="2.4" rx="1" fill="var(--WN-amethyst)"/>
+            </svg>
+          </div>
+          <span class="text-[10px] font-semibold leading-none">Trash</span>
+          <span id="trash-count-badge" class="hidden absolute top-1 right-1.5 w-4 h-4 rounded-full bg-[#977ADC] text-[#11130C] text-[9px] font-bold items-center justify-center shadow">0</span>
         </button>
       </div>
     </aside>
@@ -475,7 +733,7 @@
       <!-- Hardware-Accelerated Transform World -->
       <div id="canvas-world">
         <!-- SVG Layer for Bezier Connectors & Live Dragging Line -->
-        <svg id="connections-svg" class="overflow-visible pointer-events-auto" style="position:absolute; top:0; left:0; width:1px; height:1px; z-index:5;">
+        <svg id="connections-svg" class="overflow-visible pointer-events-none" style="position:absolute; top:0; left:0; width:1px; height:1px; z-index:25;">
           <defs>
             <marker id="arrow-amethyst" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto" markerUnits="strokeWidth">
               <path d="M0,0 L0,7 L8,3.5 z" fill="#977ADC" />
@@ -516,44 +774,46 @@
           <button onclick="spawnFromQuickMenu('link')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#CEBE7E]"></span>Bookmark</button>
           <button onclick="spawnFromQuickMenu('swatch')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#977ADC]"></span>Color Swatch</button>
           <button onclick="spawnFromQuickMenu('header')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#E8ECDF]"></span>Header Title</button>
+          <button onclick="spawnFromQuickMenu('arrow')" class="col-span-2 flex items-center justify-center gap-2 px-2.5 py-2 rounded-lg bg-[#1C1F15] hover:bg-[#977ADC] hover:text-[#11130C] font-semibold transition"><span>↗ Add Freeform / Attachable Arrow</span></button>
         </div>
       </div>
 
-      <!-- Bottom-Left Canvas Mode, Grid & Snap Controls -->
-      <div class="absolute bottom-4 left-4 z-30 flex items-center gap-1.5 bg-[#11130C]/95 backdrop-blur-md text-[#E8ECDF] px-2.5 py-1.5 rounded-xl border border-[#2D3223] shadow-lg text-xs">
-        <button id="btn-mode-select" onclick="setInteractionMode('select')" class="px-2 py-1 rounded-lg bg-[#977ADC] text-[#11130C] font-semibold transition" title="Pointer / Marquee Select Mode (V)">Select</button>
-        <button id="btn-mode-pan" onclick="setInteractionMode('pan')" class="px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/80 transition" title="Hand Pan Mode (H or Hold Spacebar)">Pan</button>
-        <div class="h-4 w-[1px] bg-[#2D3223] mx-0.5"></div>
-        <button id="btn-grid-toggle" onclick="cycleGridMode()" class="px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#CEBE7E] transition" title="Cycle Canvas Background: Dots / Lines / Blank">Grid: Dots</button>
-        <button id="btn-snap-toggle" onclick="toggleSnapToGrid()" class="px-2 py-1 rounded-lg bg-[#23271A] text-[#E8ECDF] transition" title="Toggle 16px Magnetic Snap-to-Grid">Snap: ON</button>
-        <div class="hidden sm:flex items-center gap-1 pl-2 border-l border-[#2D3223] text-[11px] text-[#E8ECDF]/70">
-          <span id="board-stats-pill">0 cards</span>
+      <!-- Bottom-Left 3D On-Background Legend & Mode Deck -->
+      <div class="panel-3d-deck absolute bottom-5 left-5 z-30 flex items-center gap-2 px-3 py-2 text-[#E8ECDF] text-xs">
+        <button id="btn-mode-select" onclick="setInteractionMode('select')" class="btn-3d-key btn-3d-key-active px-2.5 py-1 text-xs" title="Pointer / Marquee Select Mode (V)">Select</button>
+        <button id="btn-mode-pan" onclick="setInteractionMode('pan')" class="btn-3d-key px-2.5 py-1 text-xs" title="Hand Pan Mode (H or Hold Spacebar)">Pan</button>
+        <div class="h-5 w-[1px] bg-white/10 mx-0.5"></div>
+        <button id="btn-grid-toggle" onclick="cycleGridMode()" class="btn-3d-key px-2.5 py-1 text-xs font-semibold" style="color:var(--WN-gold)" title="Cycle Canvas Background: Dots / Lines / Blank">Grid: Dots</button>
+        <button id="btn-snap-toggle" onclick="toggleSnapToGrid()" class="btn-3d-key px-2.5 py-1 text-xs font-semibold" title="Toggle 16px Magnetic Snap-to-Grid">Snap: ON</button>
+        <div class="hidden sm:flex items-center gap-1.5 pl-2.5 border-l border-white/10 text-[11px]">
+          <span class="w-2 h-2 rounded-full shadow" style="background:var(--WN-amethyst)"></span>
+          <span id="board-stats-pill" class="px-2 py-0.5 rounded-md bg-black/45 border border-white/10 font-mono text-[11px] text-[#E8ECDF]/90 shadow-inner">0 cards</span>
         </div>
       </div>
 
-      <!-- Bottom-Right Zoom Bar & Interactive Minimap Radar -->
-      <div class="absolute bottom-4 right-4 z-30 flex flex-col items-end gap-2">
-        <!-- Minimap Radar -->
-        <div id="minimap-container" class="bg-[#11130C]/95 border border-[#2D3223] rounded-xl p-2 shadow-xl w-44 h-28 relative overflow-hidden cursor-pointer" onclick="onMinimapClick(event)" title="Click anywhere on radar to jump viewport">
-          <div class="flex items-center justify-between text-[9px] uppercase tracking-wider text-[#CEBE7E]/80 mb-1 pointer-events-none">
+      <!-- Bottom-Right 3D Spatial Radar & 3D Zoom Deck -->
+      <div class="absolute bottom-5 right-5 z-30 flex flex-col items-end gap-2.5">
+        <!-- 3D Minimap Radar Deck -->
+        <div id="minimap-container" class="panel-3d-deck p-2.5 w-48 h-32 relative overflow-hidden cursor-pointer" onclick="onMinimapClick(event)" title="Click anywhere on 3D radar to jump viewport">
+          <div class="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider mb-1.5 pointer-events-none" style="color:var(--WN-gold)">
             <span>Spatial Radar</span>
-            <span id="minimap-coords">0, 0</span>
+            <span id="minimap-coords" class="font-mono px-1.5 py-0.2 rounded bg-black/50 border border-white/10">0, 0</span>
           </div>
-          <div id="minimap-canvas" class="relative w-full h-20 bg-[#1B1E14] rounded border border-[#2D3223] overflow-hidden">
+          <div id="minimap-canvas" class="relative w-full h-20 bg-[#0B0D08] rounded-lg border border-white/15 shadow-inner overflow-hidden">
             <div id="minimap-items"></div>
-            <div id="minimap-viewport-rect" class="absolute border border-[#977ADC] bg-[#977ADC]/20 rounded-sm pointer-events-none"></div>
+            <div id="minimap-viewport-rect" class="absolute border-2 rounded-sm pointer-events-none" style="border-color:var(--WN-amethyst); background:rgba(151,122,220,0.22)"></div>
           </div>
         </div>
 
-        <!-- Zoom Controls -->
-        <div class="flex items-center gap-1 bg-[#11130C]/95 backdrop-blur-md text-[#E8ECDF] px-2 py-1 rounded-xl border border-[#2D3223] shadow-lg text-xs">
-          <button onclick="toggleMinimap()" class="px-2 py-1 rounded hover:bg-[#23271A] text-[#CEBE7E] font-medium" title="Show / Hide Minimap Radar">Radar</button>
-          <div class="h-4 w-[1px] bg-[#2D3223]"></div>
-          <button onclick="zoomByStep(-0.15)" class="w-6 h-6 rounded hover:bg-[#23271A] flex items-center justify-center font-bold" title="Zoom Out">−</button>
-          <button id="zoom-readout" onclick="resetZoom()" class="px-2 py-0.5 rounded hover:bg-[#23271A] font-mono text-[11px] text-[#E8ECDF]" title="Click to Reset Zoom to 100%">100%</button>
-          <button onclick="zoomByStep(0.15)" class="w-6 h-6 rounded hover:bg-[#23271A] flex items-center justify-center font-bold" title="Zoom In">+</button>
-          <div class="h-4 w-[1px] bg-[#2D3223]"></div>
-          <button onclick="fitAllCardsToViewport()" class="px-2 py-1 rounded hover:bg-[#977ADC] hover:text-[#11130C] font-medium transition" title="Center & Fit All Cards on Screen">Fit All</button>
+        <!-- 3D Zoom Control Deck -->
+        <div class="panel-3d-deck flex items-center gap-1.5 px-2.5 py-1.5 text-[#E8ECDF] text-xs">
+          <button onclick="toggleMinimap()" class="btn-3d-key px-2.5 py-1 font-semibold" style="color:var(--WN-gold)" title="Show / Hide Minimap Radar">Radar</button>
+          <div class="h-4 w-[1px] bg-white/10"></div>
+          <button onclick="zoomByStep(-0.15)" class="btn-3d-key w-7 h-7 flex items-center justify-center font-extrabold text-sm" title="Zoom Out">−</button>
+          <button id="zoom-readout" onclick="resetZoom()" class="px-2.5 py-1 rounded-md bg-black/50 border border-white/10 font-mono text-[11px] font-bold text-[#E8ECDF] shadow-inner hover:border-white/30" title="Click to Reset Zoom to 100%">100%</button>
+          <button onclick="zoomByStep(0.15)" class="btn-3d-key w-7 h-7 flex items-center justify-center font-extrabold text-sm" title="Zoom In">+</button>
+          <div class="h-4 w-[1px] bg-white/10"></div>
+          <button onclick="fitAllCardsToViewport()" class="btn-3d-key px-2.5 py-1 font-semibold" title="Center & Fit All Cards on Screen">Fit All</button>
         </div>
       </div>
 
@@ -752,6 +1012,105 @@ firebase deploy --only hosting</pre>
   <div id="modal-lightbox" class="hidden fixed inset-0 bg-[#11130C]/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6" onclick="closeLightbox()">
     <img id="lightbox-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Preview" class="max-w-full max-h-[82vh] rounded-xl shadow-2xl border border-[#CEBE7E]/40 object-contain" />
     <div id="lightbox-caption" class="mt-3 text-sm font-medium text-[#E8ECDF] bg-[#11130C]/80 px-4 py-1.5 rounded-full border border-[#2D3223]"></div>
+  </div>
+
+  <!-- MODAL 7: THEME & APPEARANCE STUDIO (COLORS, ICONS, FONTS, BACKGROUND, SIDEBAR, TOP BAR) -->
+  <div id="modal-appearance" class="hidden fixed inset-0 bg-[#11130C]/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="panel-3d-deck text-[#E8ECDF] w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="p-4 border-b border-white/10 flex items-center justify-between bg-black/30">
+        <div>
+          <h3 class="text-base font-extrabold" style="color:var(--WN-gold)">Willnote Theme &amp; Appearance Studio</h3>
+          <p class="text-xs text-[#E8ECDF]/70">Customize canvas background, sidebar, top bar, 3D icon colors, and typography</p>
+        </div>
+        <button onclick="closeAppearanceModal()" class="btn-3d-key px-2.5 py-1 text-xs">✕</button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-5 text-xs">
+        <!-- Quick Theme Presets -->
+        <div>
+          <label class="block font-bold uppercase tracking-wider text-[10px] mb-2" style="color:var(--WN-gold)">1. Instant Color Scheme Presets</label>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <button onclick="applyAppearancePreset('willnote')" class="btn-3d-key p-2.5 flex items-center gap-2 text-left">
+              <span class="w-4 h-4 rounded-full bg-[#E8ECDF] border-2 border-[#977ADC] shrink-0"></span>
+              <span class="font-semibold truncate">Willnote Original</span>
+            </button>
+            <button onclick="applyAppearancePreset('obsidian')" class="btn-3d-key p-2.5 flex items-center gap-2 text-left">
+              <span class="w-4 h-4 rounded-full bg-[#16181D] border-2 border-[#A78BFA] shrink-0"></span>
+              <span class="font-semibold truncate">Obsidian Dark</span>
+            </button>
+            <button onclick="applyAppearancePreset('espresso')" class="btn-3d-key p-2.5 flex items-center gap-2 text-left">
+              <span class="w-4 h-4 rounded-full bg-[#F3EFE6] border-2 border-[#D97742] shrink-0"></span>
+              <span class="font-semibold truncate">Warm Espresso</span>
+            </button>
+            <button onclick="applyAppearancePreset('nordic')" class="btn-3d-key p-2.5 flex items-center gap-2 text-left">
+              <span class="w-4 h-4 rounded-full bg-[#EAF0F6] border-2 border-[#38BDF8] shrink-0"></span>
+              <span class="font-semibold truncate">Nordic Cobalt</span>
+            </button>
+            <button onclick="applyAppearancePreset('tactical')" class="btn-3d-key p-2.5 flex items-center gap-2 text-left">
+              <span class="w-4 h-4 rounded-full bg-[#E5E3DA] border-2 border-[#84A955] shrink-0"></span>
+              <span class="font-semibold truncate">Tactical Olive</span>
+            </button>
+            <button onclick="applyAppearancePreset('willnote')" class="btn-3d-key p-2.5 flex items-center justify-center font-bold text-[#CEBE7E]">
+              Reset Default
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Color Pickers for Every Surface & Icon Role -->
+        <div>
+          <label class="block font-bold uppercase tracking-wider text-[10px] mb-2" style="color:var(--WN-gold)">2. Custom Surface &amp; 3D Icon Colors</label>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-black/30 p-3.5 rounded-xl border border-white/10">
+            <label class="flex items-center justify-between gap-2 cursor-pointer">
+              <span>Canvas Background</span>
+              <input id="clr-canvas-bg" type="color" value="#E8ECDF" oninput="updateAppearanceColor('bgCanvas', this.value)" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0" />
+            </label>
+            <label class="flex items-center justify-between gap-2 cursor-pointer">
+              <span>Top Bar Surface</span>
+              <input id="clr-topbar-bg" type="color" value="#11130C" oninput="updateAppearanceColor('bgTopbar', this.value)" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0" />
+            </label>
+            <label class="flex items-center justify-between gap-2 cursor-pointer">
+              <span>Sidebar Surface</span>
+              <input id="clr-sidebar-bg" type="color" value="#11130C" oninput="updateAppearanceColor('bgSidebar', this.value)" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0" />
+            </label>
+            <label class="flex items-center justify-between gap-2 cursor-pointer">
+              <span>Primary Icon / Accent</span>
+              <input id="clr-accent-primary" type="color" value="#977ADC" oninput="updateAppearanceColor('accentPrimary', this.value)" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0" />
+            </label>
+            <label class="flex items-center justify-between gap-2 cursor-pointer">
+              <span>Secondary Icon / Gold</span>
+              <input id="clr-accent-secondary" type="color" value="#CEBE7E" oninput="updateAppearanceColor('accentSecondary', this.value)" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0" />
+            </label>
+            <label class="flex items-center justify-between gap-2 cursor-pointer">
+              <span>Default Card Fill</span>
+              <input id="clr-card-ivory" type="color" value="#F5F7F0" oninput="updateAppearanceColor('cardIvory', this.value)" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Font Family Selector -->
+        <div>
+          <label class="block font-bold uppercase tracking-wider text-[10px] mb-2" style="color:var(--WN-gold)">3. Workspace &amp; Card Typography Font</label>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button onclick="updateAppearanceFont('sans')" class="btn-3d-key p-2.5 text-left" style="font-family: 'Inter', sans-serif;">
+              <div class="font-bold text-sm">Modern Sans</div>
+              <div class="text-[10px] opacity-65">Clean UI &amp; geometric notes</div>
+            </button>
+            <button onclick="updateAppearanceFont('serif')" class="btn-3d-key p-2.5 text-left" style="font-family: Georgia, Cambria, serif;">
+              <div class="font-bold text-sm">Editorial Serif</div>
+              <div class="text-[10px] opacity-65">Bookish &amp; literary boards</div>
+            </button>
+            <button onclick="updateAppearanceFont('mono')" class="btn-3d-key p-2.5 text-left" style="font-family: 'JetBrains Mono', monospace;">
+              <div class="font-bold text-sm">Technical Mono</div>
+              <div class="text-[10px] opacity-65">Code, specs &amp; engineering</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-3.5 border-t border-white/10 bg-black/40 flex justify-end">
+        <button onclick="closeAppearanceModal()" class="btn-3d-key btn-3d-key-active px-5 py-1.5 text-xs">Done</button>
+      </div>
+    </div>
   </div>
 
   <!-- TOAST NOTIFICATION CONTAINER -->
@@ -998,35 +1357,38 @@ firebase deploy --only hosting</pre>
               {
                 id: 'conn-1',
                 fromCardId: 'board-brand',
-                fromSide: 'bottom',
                 toCardId: 'note-guide',
-                toSide: 'top',
-                color: '#977ADC',
+                bendX: -55,
+                bendY: 10,
+                color: '#11130C',
                 dashed: false,
                 curved: true,
-                label: 'Design System'
+                showLabel: false,
+                label: ''
               },
               {
                 id: 'conn-2',
                 fromCardId: 'board-roadmap',
-                fromSide: 'bottom',
                 toCardId: 'todo-launch',
-                toSide: 'top',
-                color: '#CEBE7E',
+                bendX: 45,
+                bendY: 0,
+                color: '#977ADC',
                 dashed: true,
                 curved: true,
+                showLabel: true,
                 label: 'Active Sprint'
               },
               {
                 id: 'conn-3',
                 fromCardId: 'todo-launch',
-                fromSide: 'right',
                 toCardId: 'col-main',
-                toSide: 'left',
-                color: '#977ADC',
+                bendX: 0,
+                bendY: -35,
+                color: '#11130C',
                 dashed: false,
                 curved: true,
-                label: 'Stack Flow'
+                showLabel: false,
+                label: ''
               }
             ]
           },
@@ -1329,6 +1691,7 @@ firebase deploy --only hosting</pre>
      * RENDERING ENGINE: WORLD, BREADCRUMBS, CARDS, COLUMNS & CONNECTORS
      *************************************************************************/
     function renderAll() {
+      applyAppearanceSettings();
       applyViewportTransform();
       renderBreadcrumbs();
       renderCards();
@@ -1346,7 +1709,9 @@ firebase deploy --only hosting</pre>
       var world = document.getElementById('canvas-world');
       var vp = document.getElementById('canvas-viewport');
       if (world) {
-        world.style.transform = 'translate3d(' + b.panX + 'px, ' + b.panY + 'px, 0) scale(' + b.zoom + ')';
+        var rx = Math.round(b.panX);
+        var ry = Math.round(b.panY);
+        world.style.transform = 'translate(' + rx + 'px, ' + ry + 'px) scale(' + b.zoom + ')';
       }
       if (vp) {
         vp.classList.remove('grid-dots', 'grid-lines', 'grid-blank');
@@ -1445,27 +1810,39 @@ firebase deploy --only hosting</pre>
         }
 
         if (c.type === 'note') {
+          var hasHeader = !!c.showHeader;
+          var hasFooter = !!c.showFooter;
           html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
             'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
-            'class="wn-card ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' flex flex-col" ' +
-            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 280) + 'px; z-index:' + zIndex + ';">' +
+            'class="wn-card group ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' flex flex-col rounded-[4px]" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 260) + 'px; z-index:' + zIndex + ';">' +
             renderCardPorts(c.id) +
-            '<div class="card-drag-handle px-3.5 pt-2.5 pb-1.5 border-b border-current/10 flex items-center justify-between cursor-move">' +
-              '<input type="text" value="' + escapeAttr(c.title || '') + '" placeholder="Note heading..." ' +
-                'oninput="updateCardField(\'' + c.id + '\', \'title\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'title\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
-                'class="bg-transparent font-bold text-sm w-full focus:outline-none" />' +
-              (c.locked ? '<span class="text-xs ml-1">🔒</span>' : '') +
+            '<!-- Subtle top drag strip & hover Header/Footer toggles -->' +
+            '<div class="card-drag-handle h-2.5 w-full cursor-move flex items-center justify-end pr-1.5 relative">' +
+              '<div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 right-0 flex items-center gap-1 bg-[#11130C]/90 text-[#E8ECDF] px-1.5 py-0.5 rounded shadow text-[10px] z-30">' +
+                '<button onclick="event.stopPropagation(); toggleNoteHeader(\'' + c.id + '\')" class="px-1 hover:text-[#977ADC] ' + (hasHeader ? 'text-[#977ADC] font-bold' : '') + '" title="Toggle Header">Header</button>' +
+                '<span class="opacity-30">|</span>' +
+                '<button onclick="event.stopPropagation(); toggleNoteFooter(\'' + c.id + '\')" class="px-1 hover:text-[#CEBE7E] ' + (hasFooter ? 'text-[#CEBE7E] font-bold' : '') + '" title="Toggle Footer">Footer</button>' +
+              '</div>' +
             '</div>' +
-            '<!-- Mini Rich Formatting Bar -->' +
-            '<div class="px-3 py-1 bg-black/5 flex items-center gap-1 text-[11px] opacity-75 hover:opacity-100 transition">' +
-              '<button onclick="formatNoteText(\'' + c.id + '\', \'bold\')" class="px-1.5 py-0.5 rounded hover:bg-black/10 font-bold" title="Bold">B</button>' +
-              '<button onclick="formatNoteText(\'' + c.id + '\', \'italic\')" class="px-1.5 py-0.5 rounded hover:bg-black/10 italic" title="Italic">I</button>' +
-              '<button onclick="formatNoteText(\'' + c.id + '\', \'insertUnorderedList\')" class="px-1.5 py-0.5 rounded hover:bg-black/10" title="Bullet List">• List</button>' +
-              '<button onclick="appendNoteQuote(\'' + c.id + '\')" class="px-1.5 py-0.5 rounded hover:bg-black/10" title="Add Highlight Quote">❝ Quote</button>' +
-            '</div>' +
-            '<div id="note-body-' + c.id + '" contenteditable="true" data-placeholder="Write notes, ideas, or paste text..." ' +
+            (hasHeader ? (
+              '<div class="px-3.5 pt-1 pb-1.5 border-b border-current/10 flex items-center justify-between">' +
+                '<input type="text" value="' + escapeAttr(c.title || '') + '" placeholder="Header..." ' +
+                  'oninput="updateCardField(\'' + c.id + '\', \'title\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'title\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                  'class="bg-transparent font-bold text-xs w-full focus:outline-none" />' +
+                (c.locked ? '<span class="text-[10px] ml-1">🔒</span>' : '') +
+              '</div>'
+            ) : '') +
+            '<div id="note-body-' + c.id + '" contenteditable="true" data-placeholder="Start typing..." ' +
               'oninput="updateCardField(\'' + c.id + '\', \'content\', this.innerHTML)" onkeyup="updateCardField(\'' + c.id + '\', \'content\', this.innerHTML)" onblur="updateCardField(\'' + c.id + '\', \'content\', this.innerHTML)" ' +
-              'class="note-editor px-3.5 py-2.5 text-xs leading-relaxed focus:outline-none min-h-[76px]">' + (c.content || '') + '</div>' +
+              'class="note-editor px-3.5 py-2 text-xs leading-relaxed focus:outline-none min-h-[38px]">' + (c.content || '') + '</div>' +
+            (hasFooter ? (
+              '<div class="px-3.5 pt-1.5 pb-2 border-t border-current/10">' +
+                '<input type="text" value="' + escapeAttr(c.footer || '') + '" placeholder="Footer..." ' +
+                  'oninput="updateCardField(\'' + c.id + '\', \'footer\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'footer\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                  'class="bg-transparent text-[11px] opacity-65 w-full focus:outline-none" />' +
+              '</div>'
+            ) : '<div class="h-2 w-full cursor-move"></div>') +
             renderResizeHandle(c.id) +
           '</div>';
           continue;
@@ -1681,36 +2058,82 @@ firebase deploy --only hosting</pre>
     }
 
     /*************************************************************************
-     * BEZIER CONNECTOR SVG ENGINE
+     * DYNAMIC PERIMETER & FREEFORM ARCH ARROW ENGINE
      *************************************************************************/
-    function getCardPortCoordinates(card, side) {
+    function getCardBox(card) {
       var el = document.getElementById('card-' + card.id);
       var w = card.w || 260;
-      var h = el ? el.offsetHeight : 140;
-      if (side === 'top') return { x: card.x + w / 2, y: card.y };
-      if (side === 'bottom') return { x: card.x + w / 2, y: card.y + h };
-      if (side === 'left') return { x: card.x, y: card.y + h / 2 };
-      return { x: card.x + w, y: card.y + h / 2 };
+      var h = el ? el.offsetHeight : 110;
+      return {
+        x: card.x,
+        y: card.y,
+        w: w,
+        h: h,
+        cx: card.x + w / 2,
+        cy: card.y + h / 2
+      };
     }
 
-    function computeBezierPath(p1, s1, p2, s2, curved) {
-      if (!curved) {
-        return 'M ' + p1.x + ' ' + p1.y + ' L ' + p2.x + ' ' + p2.y;
+    // Ray-Rectangle intersection: returns exact point on card boundary facing targetPt
+    function getCardPerimeterPoint(card, targetPt, pad) {
+      var box = getCardBox(card);
+      var dx = targetPt.x - box.cx;
+      var dy = targetPt.y - box.cy;
+      if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
+        return { x: box.cx + box.w / 2, y: box.cy };
       }
-      var dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      var offset = Math.min(140, Math.max(45, dist * 0.42));
-      var c1x = p1.x, c1y = p1.y, c2x = p2.x, c2y = p2.y;
-      if (s1 === 'top') c1y -= offset;
-      else if (s1 === 'bottom') c1y += offset;
-      else if (s1 === 'left') c1x -= offset;
-      else c1x += offset;
+      var p = (typeof pad === 'number') ? pad : 2;
+      var hw = box.w / 2 + p;
+      var hh = box.h / 2 + p;
+      var tx = Math.abs(dx) > 0.0001 ? (hw / Math.abs(dx)) : Infinity;
+      var ty = Math.abs(dy) > 0.0001 ? (hh / Math.abs(dy)) : Infinity;
+      var t = Math.min(tx, ty);
+      return {
+        x: Math.round((box.cx + dx * t) * 10) / 10,
+        y: Math.round((box.cy + dy * t) * 10) / 10
+      };
+    }
 
-      if (s2 === 'top') c2y -= offset;
-      else if (s2 === 'bottom') c2y += offset;
-      else if (s2 === 'left') c2x -= offset;
-      else c2x += offset;
+    // Computes dynamic start point (p1), end point (p2), curve midpoint handle (mid), and quadratic bezier control point (qCtrl)
+    function computeConnectorGeometry(cn) {
+      var fromCard = cn.fromCardId ? findCardById(cn.fromCardId) : null;
+      var toCard = cn.toCardId ? findCardById(cn.toCardId) : null;
 
-      return 'M ' + p1.x + ' ' + p1.y + ' C ' + c1x + ' ' + c1y + ', ' + c2x + ' ' + c2y + ', ' + p2.x + ' ' + p2.y;
+      var c1 = fromCard ? { x: getCardBox(fromCard).cx, y: getCardBox(fromCard).cy } : { x: (typeof cn.startX === 'number' ? cn.startX : 200), y: (typeof cn.startY === 'number' ? cn.startY : 200) };
+      var c2 = toCard ? { x: getCardBox(toCard).cx, y: getCardBox(toCard).cy } : { x: (typeof cn.endX === 'number' ? cn.endX : 420), y: (typeof cn.endY === 'number' ? cn.endY : 200) };
+
+      var bendX = cn.bendX || 0;
+      var bendY = cn.bendY || 0;
+
+      // Aim point in world space that determines the direction of the arrow leaving fromCard and entering toCard
+      var aimX = (c1.x + c2.x) / 2 + bendX * 2;
+      var aimY = (c1.y + c2.y) / 2 + bendY * 2;
+
+      var p1 = fromCard ? getCardPerimeterPoint(fromCard, { x: aimX, y: aimY }, 1) : c1;
+      var p2 = toCard ? getCardPerimeterPoint(toCard, { x: (bendX === 0 && bendY === 0) ? p1.x : aimX, y: (bendX === 0 && bendY === 0) ? p1.y : aimY }, 4) : c2;
+      if (fromCard && bendX === 0 && bendY === 0) {
+        p1 = getCardPerimeterPoint(fromCard, p2, 1);
+      }
+
+      var straightMidX = (p1.x + p2.x) / 2;
+      var straightMidY = (p1.y + p2.y) / 2;
+
+      // Actual midpoint on the quadratic Bezier curve (where the arch handle sits)
+      var midX = straightMidX + bendX;
+      var midY = straightMidY + bendY;
+
+      // Control point Q so that B(0.5) passes directly through (midX, midY)
+      var qCtrlX = straightMidX + bendX * 2;
+      var qCtrlY = straightMidY + bendY * 2;
+
+      var d = 'M ' + p1.x + ' ' + p1.y + ' Q ' + qCtrlX + ' ' + qCtrlY + ' ' + p2.x + ' ' + p2.y;
+      return {
+        p1: p1,
+        p2: p2,
+        mid: { x: midX, y: midY },
+        qCtrl: { x: qCtrlX, y: qCtrlY },
+        d: d
+      };
     }
 
     function renderConnectors() {
@@ -1722,39 +2145,48 @@ firebase deploy --only hosting</pre>
 
       for (var i = 0; i < conns.length; i++) {
         var cn = conns[i];
-        var fromCard = findCardById(cn.fromCardId);
-        var toCard = findCardById(cn.toCardId);
-        if (!fromCard || !toCard) continue;
+        // Clean up orphaned card references if a card was deleted but keep arrow if it has coordinates
+        if (cn.fromCardId && !findCardById(cn.fromCardId) && typeof cn.startX !== 'number') continue;
+        if (cn.toCardId && !findCardById(cn.toCardId) && typeof cn.endX !== 'number') continue;
 
-        var p1 = getCardPortCoordinates(fromCard, cn.fromSide || 'right');
-        var p2 = getCardPortCoordinates(toCard, cn.toSide || 'left');
-        var d = computeBezierPath(p1, cn.fromSide || 'right', p2, cn.toSide || 'left', cn.curved !== false);
-
-        var col = cn.color || '#977ADC';
-        var markerId = 'arrow-amethyst';
-        if (col.toUpperCase() === '#CEBE7E') markerId = 'arrow-gold';
-        else if (col.toUpperCase() === '#11130C') markerId = 'arrow-obsidian';
+        var geom = computeConnectorGeometry(cn);
+        var col = cn.color || '#11130C';
+        var markerId = 'arrow-obsidian';
+        if (col.toUpperCase() === '#977ADC') markerId = 'arrow-amethyst';
+        else if (col.toUpperCase() === '#CEBE7E') markerId = 'arrow-gold';
 
         var isSel = (selectedConnectorId === cn.id);
-        var midX = (p1.x + p2.x) / 2;
-        var midY = (p1.y + p2.y) / 2;
+        var showLbl = !!cn.showLabel || !!(cn.label && cn.label.trim());
 
-        svgHtml += '<g class="cursor-pointer" onclick="onConnectorClick(event, \'' + cn.id + '\')">' +
-          '<!-- Invisible wide hit area -->' +
-          '<path d="' + d + '" fill="none" stroke="transparent" stroke-width="16" />' +
-          '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="' + (isSel ? '3.8' : '2.4') + '" ' +
+        svgHtml += '<g class="group cursor-pointer pointer-events-auto" onclick="onConnectorClick(event, \'' + cn.id + '\')">' +
+          '<!-- Wide transparent hit path for easy clicking -->' +
+          '<path d="' + geom.d + '" fill="none" stroke="transparent" stroke-width="20" />' +
+          '<path d="' + geom.d + '" fill="none" stroke="' + col + '" stroke-width="' + (isSel ? '2.8' : '2') + '" ' +
             (cn.dashed ? 'stroke-dasharray="7,5" class="connector-dashed"' : '') +
             ' marker-end="url(#' + markerId + ')" />' +
-          '<foreignObject x="' + (midX - 65) + '" y="' + (midY - 13) + '" width="130" height="28" class="overflow-visible">' +
-            '<div xmlns="http://www.w3.org/1999/xhtml" class="flex justify-center">' +
-              '<input type="text" value="' + escapeAttr(cn.label || '') + '" placeholder="+ label" ' +
-                'onclick="onConnectorClick(event, \'' + cn.id + '\')" ' +
-                'oninput="updateConnectorLabel(\'' + cn.id + '\', this.value)" onchange="updateConnectorLabel(\'' + cn.id + '\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
-                'class="px-2 py-0.5 rounded-full text-[10px] font-bold text-center bg-[#11130C] text-[#E8ECDF] border ' +
-                (isSel ? 'border-[#977ADC] ring-2 ring-[#977ADC]/50' : 'border-[#CEBE7E]/50') +
-                ' shadow focus:outline-none w-24 truncate" />' +
-            '</div>' +
-          '</foreignObject>' +
+          (showLbl ? (
+            '<foreignObject x="' + (geom.mid.x - 65) + '" y="' + (geom.mid.y - 28) + '" width="130" height="26" class="overflow-visible">' +
+              '<div xmlns="http://www.w3.org/1999/xhtml" class="flex justify-center">' +
+                '<input type="text" value="' + escapeAttr(cn.label || '') + '" placeholder="Label..." ' +
+                  'onclick="onConnectorClick(event, \'' + cn.id + '\')" ' +
+                  'oninput="updateConnectorLabel(\'' + cn.id + '\', this.value)" onchange="updateConnectorLabel(\'' + cn.id + '\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                  'class="px-2 py-0.5 rounded-full text-[10px] font-bold text-center bg-[#11130C] text-[#E8ECDF] border border-[#977ADC] shadow focus:outline-none w-24 truncate" />' +
+              '</div>' +
+            '</foreignObject>'
+          ) : '') +
+          '<!-- 3 Interactive Handles: Start Point, Middle Arch Control Point, and End Point (no CSS transform scale so zero SVG origin vibration) -->' +
+          '<g onmousedown="onConnectorHandleMouseDown(event, \'' + cn.id + '\', \'start\')" class="' + (isSel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100') + '">' +
+            '<circle cx="' + geom.p1.x + '" cy="' + geom.p1.y + '" r="11" fill="transparent" class="cursor-grab" />' +
+            '<circle cx="' + geom.p1.x + '" cy="' + geom.p1.y + '" r="5.5" fill="#F5F7F0" stroke="#11130C" stroke-width="1.8" class="conn-handle" title="Drag start handle to attach to any card or move freely" />' +
+          '</g>' +
+          '<g onmousedown="onConnectorHandleMouseDown(event, \'' + cn.id + '\', \'arch\')" ondblclick="event.stopPropagation(); resetConnectorArchById(\'' + cn.id + '\')" class="' + (isSel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100') + '">' +
+            '<circle cx="' + geom.mid.x + '" cy="' + geom.mid.y + '" r="12" fill="transparent" class="cursor-grab" />' +
+            '<circle cx="' + geom.mid.x + '" cy="' + geom.mid.y + '" r="6" fill="#F5F7F0" stroke="#977ADC" stroke-width="2.2" class="conn-handle" title="Drag middle handle to bend arrow arch freely (double-click to straighten)" />' +
+          '</g>' +
+          '<g onmousedown="onConnectorHandleMouseDown(event, \'' + cn.id + '\', \'end\')" class="' + (isSel ? 'opacity-100' : 'opacity-0 group-hover:opacity-100') + '">' +
+            '<circle cx="' + geom.p2.x + '" cy="' + geom.p2.y + '" r="11" fill="transparent" class="cursor-grab" />' +
+            '<circle cx="' + geom.p2.x + '" cy="' + geom.p2.y + '" r="5.5" fill="#F5F7F0" stroke="#11130C" stroke-width="1.8" class="conn-handle" title="Drag end handle to attach to any card or move freely" />' +
+          '</g>' +
         '</g>';
       }
 
@@ -1799,6 +2231,18 @@ firebase deploy --only hosting</pre>
             origPanY: b.panY
           };
           vp.classList.add('panning-active');
+          return;
+        }
+
+        // If in Arrow Connect Mode, allow drawing a freeform arrow starting right from empty canvas space
+        if (e.button === 0 && interactionMode === 'connect') {
+          var startWorld = screenToWorld(e.clientX, e.clientY);
+          activePointerAction = {
+            type: 'connectPort',
+            fromCardId: null,
+            startX: Math.round(startWorld.x),
+            startY: Math.round(startWorld.y)
+          };
           return;
         }
 
@@ -1919,16 +2363,54 @@ firebase deploy --only hosting</pre>
 
         if (activePointerAction.type === 'connectPort') {
           var pt = screenToWorld(e.clientX, e.clientY);
-          var fromCard = findCardById(activePointerAction.fromCardId);
-          if (fromCard) {
-            var p1 = getCardPortCoordinates(fromCard, activePointerAction.fromSide);
-            var d = computeBezierPath(p1, activePointerAction.fromSide, pt, 'left', true);
-            var tempPath = document.getElementById('temp-connector-path');
-            if (tempPath) {
-              tempPath.setAttribute('d', d);
-              tempPath.classList.remove('hidden');
+          var fromCard = activePointerAction.fromCardId ? findCardById(activePointerAction.fromCardId) : null;
+          var p1 = fromCard ? getCardPerimeterPoint(fromCard, pt, 1) : { x: activePointerAction.startX, y: activePointerAction.startY };
+          var d = 'M ' + p1.x + ' ' + p1.y + ' L ' + Math.round(pt.x) + ' ' + Math.round(pt.y);
+          var tempPath = document.getElementById('temp-connector-path');
+          if (tempPath) {
+            tempPath.setAttribute('d', d);
+            tempPath.classList.remove('hidden');
+          }
+          highlightCardForArrowAttachment(e.clientX, e.clientY, activePointerAction.fromCardId);
+          return;
+        }
+
+        if (activePointerAction.type === 'dragConnectorHandle') {
+          var hPt = screenToWorld(e.clientX, e.clientY);
+          var cn = findConnectorById(activePointerAction.connId);
+          if (!cn) return;
+          if (activePointerAction.handle === 'arch') {
+            var geomNow = computeConnectorGeometry(cn);
+            var sMidX = (geomNow.p1.x + geomNow.p2.x) / 2;
+            var sMidY = (geomNow.p1.y + geomNow.p2.y) / 2;
+            cn.bendX = Math.round(hPt.x - sMidX);
+            cn.bendY = Math.round(hPt.y - sMidY);
+          } else if (activePointerAction.handle === 'start') {
+            var hoverStartCard = findAnyCardUnderCursor(e.clientX, e.clientY, cn.toCardId);
+            clearDropTargetHighlights();
+            if (hoverStartCard) {
+              cn.fromCardId = hoverStartCard.id;
+              var elS = document.getElementById('card-' + hoverStartCard.id);
+              if (elS) elS.classList.add('drop-target-active');
+            } else {
+              cn.fromCardId = null;
+              cn.startX = Math.round(hPt.x);
+              cn.startY = Math.round(hPt.y);
+            }
+          } else if (activePointerAction.handle === 'end') {
+            var hoverEndCard = findAnyCardUnderCursor(e.clientX, e.clientY, cn.fromCardId);
+            clearDropTargetHighlights();
+            if (hoverEndCard) {
+              cn.toCardId = hoverEndCard.id;
+              var elE = document.getElementById('card-' + hoverEndCard.id);
+              if (elE) elE.classList.add('drop-target-active');
+            } else {
+              cn.toCardId = null;
+              cn.endX = Math.round(hPt.x);
+              cn.endY = Math.round(hPt.y);
             }
           }
+          renderConnectors();
           return;
         }
 
@@ -1973,6 +2455,10 @@ firebase deploy --only hosting</pre>
             if (!droppedHandled) {
               saveWorkspaceToStorage();
             }
+          } else if (activePointerAction.focusTargetOnClick) {
+            try {
+              activePointerAction.focusTargetOnClick.focus();
+            } catch (err) {}
           }
           clearDropTargetHighlights();
         } else if (activePointerAction.type === 'resizeCard') {
@@ -1980,7 +2466,12 @@ firebase deploy --only hosting</pre>
         } else if (activePointerAction.type === 'connectPort') {
           var tempPath = document.getElementById('temp-connector-path');
           if (tempPath) tempPath.classList.add('hidden');
-          finishPortConnectionAtCursor(e.clientX, e.clientY, activePointerAction.fromCardId, activePointerAction.fromSide);
+          clearDropTargetHighlights();
+          finishPortConnectionAtCursor(e.clientX, e.clientY, activePointerAction);
+        } else if (activePointerAction.type === 'dragConnectorHandle') {
+          clearDropTargetHighlights();
+          saveWorkspaceToStorage();
+          renderConnectors();
         } else if (activePointerAction.type === 'marquee') {
           var box = document.getElementById('marquee-box');
           if (box) box.classList.add('hidden');
@@ -2089,6 +2580,7 @@ firebase deploy --only hosting</pre>
           closeTemplatesModal();
           closeExportModal();
           closeTrashModal();
+          closeAppearanceModal();
           closeLightbox();
           closeQuickSpawnMenu();
           if (interactionMode === 'connect') setInteractionMode('select');
@@ -2148,7 +2640,8 @@ firebase deploy --only hosting</pre>
       }
 
       var targetTag = e.target.tagName;
-      var isInteractiveChild = (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'BUTTON' || targetTag === 'A' || e.target.isContentEditable);
+      var isAlreadyFocusedEditable = (e.target.isContentEditable && document.activeElement === e.target);
+      var isInteractiveChild = (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'BUTTON' || targetTag === 'A' || isAlreadyFocusedEditable);
 
       selectedConnectorId = null;
       if (e.shiftKey) {
@@ -2166,6 +2659,11 @@ firebase deploy --only hosting</pre>
 
       if (isInteractiveChild) return;
 
+      var pendingEditableFocus = e.target.isContentEditable ? e.target : null;
+      if (pendingEditableFocus) {
+        e.preventDefault();
+      }
+
       flushActiveEditableElement();
       pushHistorySnapshot();
       var dragItems = [];
@@ -2180,6 +2678,7 @@ firebase deploy --only hosting</pre>
         startX: e.clientX,
         startY: e.clientY,
         moved: false,
+        focusTargetOnClick: pendingEditableFocus,
         items: dragItems
       };
     }
@@ -2208,48 +2707,79 @@ firebase deploy --only hosting</pre>
       };
     }
 
-    function finishPortConnectionAtCursor(clientX, clientY, fromCardId, fromSide) {
+    function findConnectorById(connId) {
+      var b = getCurrentBoard();
+      for (var i = 0; i < b.connectors.length; i++) {
+        if (b.connectors[i].id === connId) return b.connectors[i];
+      }
+      return null;
+    }
+
+    function findAnyCardUnderCursor(clientX, clientY, excludeCardId) {
       var b = getCurrentBoard();
       var pt = screenToWorld(clientX, clientY);
-      var targetCard = null;
-
       for (var i = b.cards.length - 1; i >= 0; i--) {
         var c = b.cards[i];
-        if (c.id === fromCardId) continue;
-        var el = document.getElementById('card-' + c.id);
-        var w = c.w || 260;
-        var h = el ? el.offsetHeight : 140;
-        if (pt.x >= c.x - 16 && pt.x <= c.x + w + 16 && pt.y >= c.y - 16 && pt.y <= c.y + h + 16) {
-          targetCard = c;
-          break;
+        if (excludeCardId && c.id === excludeCardId) continue;
+        var box = getCardBox(c);
+        if (pt.x >= box.x - 10 && pt.x <= box.x + box.w + 10 && pt.y >= box.y - 10 && pt.y <= box.y + box.h + 10) {
+          return c;
         }
       }
+      return null;
+    }
 
-      if (!targetCard) return;
+    function highlightCardForArrowAttachment(clientX, clientY, excludeCardId) {
+      clearDropTargetHighlights();
+      var target = findAnyCardUnderCursor(clientX, clientY, excludeCardId);
+      if (target) {
+        var el = document.getElementById('card-' + target.id);
+        if (el) el.classList.add('drop-target-active');
+      }
+    }
 
-      // Determine closest side on target card
-      var fromCard = findCardById(fromCardId);
-      var toSide = 'left';
-      if (fromCard) {
-        var dx = targetCard.x - fromCard.x;
-        var dy = targetCard.y - fromCard.y;
-        if (Math.abs(dx) > Math.abs(dy)) {
-          toSide = dx > 0 ? 'left' : 'right';
-        } else {
-          toSide = dy > 0 ? 'top' : 'bottom';
-        }
+    function onConnectorHandleMouseDown(e, connId, handleType) {
+      e.stopPropagation();
+      e.preventDefault();
+      pushHistorySnapshot();
+      selectedConnectorId = connId;
+      selectedCardIds = [];
+      updateSelectedCardClasses();
+      renderSelectionBar();
+      activePointerAction = {
+        type: 'dragConnectorHandle',
+        connId: connId,
+        handle: handleType
+      };
+    }
+
+    function finishPortConnectionAtCursor(clientX, clientY, actionInfo) {
+      var b = getCurrentBoard();
+      var pt = screenToWorld(clientX, clientY);
+      var fromCardId = actionInfo.fromCardId || null;
+      var targetCard = findAnyCardUnderCursor(clientX, clientY, fromCardId);
+
+      // Ignore tiny accidental clicks
+      if (!fromCardId && !targetCard) {
+        var dist = Math.hypot(pt.x - (actionInfo.startX || 0), pt.y - (actionInfo.startY || 0));
+        if (dist < 24) return;
       }
 
       pushHistorySnapshot();
       var newConn = {
         id: uid('conn'),
         fromCardId: fromCardId,
-        fromSide: fromSide,
-        toCardId: targetCard.id,
-        toSide: toSide,
-        color: '#977ADC',
+        startX: fromCardId ? undefined : Math.round(actionInfo.startX || (pt.x - 140)),
+        startY: fromCardId ? undefined : Math.round(actionInfo.startY || (pt.y + 60)),
+        toCardId: targetCard ? targetCard.id : null,
+        endX: targetCard ? undefined : Math.round(pt.x),
+        endY: targetCard ? undefined : Math.round(pt.y),
+        bendX: 0,
+        bendY: 0,
+        color: '#11130C',
         dashed: false,
         curved: true,
+        showLabel: false,
         label: ''
       };
       b.connectors.push(newConn);
@@ -2258,7 +2788,7 @@ firebase deploy --only hosting</pre>
       if (interactionMode === 'connect') setInteractionMode('select');
       saveWorkspaceToStorage();
       renderAll();
-      showToast('Connected cards');
+      showToast('Added arrow — drag its 3 handles to attach to cards or curve the arch');
     }
 
     /*************************************************************************
@@ -2525,15 +3055,18 @@ firebase deploy --only hosting</pre>
           z: z
         };
       }
-      // Default: Rich Note Card
+      // Default: Plain Note Card (matches Milanote clean note bar with optional header/footer)
       return {
         id: uid('note'),
         type: 'note',
         x: x,
         y: y,
-        w: 280,
-        title: 'Untitled Note',
-        content: 'Write your thoughts, specs, or brainstorm here...',
+        w: 260,
+        title: '',
+        footer: '',
+        showHeader: false,
+        showFooter: false,
+        content: '',
         theme: 'ivory',
         z: z
       };
@@ -2559,6 +3092,31 @@ firebase deploy --only hosting</pre>
         var cardType = rawPayload.replace('willnote-dock:', '');
         if (!cardType) return;
         pushHistorySnapshot();
+        if (cardType === 'arrow') {
+          var newArrow = {
+            id: uid('conn'),
+            fromCardId: null,
+            startX: Math.round(pt.x - 90),
+            startY: Math.round(pt.y + 45),
+            toCardId: null,
+            endX: Math.round(pt.x + 90),
+            endY: Math.round(pt.y - 45),
+            bendX: 0,
+            bendY: 0,
+            color: '#11130C',
+            dashed: false,
+            curved: true,
+            showLabel: false,
+            label: ''
+          };
+          getCurrentBoard().connectors.push(newArrow);
+          selectedConnectorId = newArrow.id;
+          selectedCardIds = [];
+          saveWorkspaceToStorage();
+          renderAll();
+          showToast('Drag the arrow ends onto any card to attach, or drag the middle dot to arch');
+          return;
+        }
         var newCard = buildNewCardObject(cardType, snapVal(pt.x - 120), snapVal(pt.y - 40));
         getCurrentBoard().cards.push(newCard);
         selectedCardIds = [newCard.id];
@@ -2603,6 +3161,31 @@ firebase deploy --only hosting</pre>
 
     function spawnFromQuickMenu(cardType) {
       pushHistorySnapshot();
+      if (cardType === 'arrow') {
+        var newArrow = {
+          id: uid('conn'),
+          fromCardId: null,
+          startX: Math.round(quickSpawnCoords.x),
+          startY: Math.round(quickSpawnCoords.y + 70),
+          toCardId: null,
+          endX: Math.round(quickSpawnCoords.x + 180),
+          endY: Math.round(quickSpawnCoords.y - 40),
+          bendX: 0,
+          bendY: 0,
+          color: '#11130C',
+          dashed: false,
+          curved: true,
+          showLabel: false,
+          label: ''
+        };
+        getCurrentBoard().connectors.push(newArrow);
+        selectedConnectorId = newArrow.id;
+        selectedCardIds = [];
+        closeQuickSpawnMenu();
+        saveWorkspaceToStorage();
+        renderAll();
+        return;
+      }
       var newCard = buildNewCardObject(cardType, quickSpawnCoords.x, quickSpawnCoords.y);
       getCurrentBoard().cards.push(newCard);
       selectedCardIds = [newCard.id];
@@ -2765,6 +3348,50 @@ firebase deploy --only hosting</pre>
       editor.focus();
       document.execCommand(command, false, null);
       updateCardField(cardId, 'content', editor.innerHTML);
+    }
+
+    function toggleNoteHeader(cardId) {
+      var c = findCardById(cardId);
+      if (!c || c.type !== 'note') return;
+      pushHistorySnapshot();
+      c.showHeader = !c.showHeader;
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+    }
+
+    function toggleNoteFooter(cardId) {
+      var c = findCardById(cardId);
+      if (!c || c.type !== 'note') return;
+      pushHistorySnapshot();
+      c.showFooter = !c.showFooter;
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+    }
+
+    function toggleSelectedNotesHeader() {
+      if (selectedCardIds.length === 0) return;
+      pushHistorySnapshot();
+      for (var i = 0; i < selectedCardIds.length; i++) {
+        var c = findCardById(selectedCardIds[i]);
+        if (c && c.type === 'note') c.showHeader = !c.showHeader;
+      }
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+    }
+
+    function toggleSelectedNotesFooter() {
+      if (selectedCardIds.length === 0) return;
+      pushHistorySnapshot();
+      for (var i = 0; i < selectedCardIds.length; i++) {
+        var c = findCardById(selectedCardIds[i]);
+        if (c && c.type === 'note') c.showFooter = !c.showFooter;
+      }
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
     }
 
     function appendNoteQuote(cardId) {
@@ -3100,6 +3727,7 @@ firebase deploy --only hosting</pre>
       var connControls = document.getElementById('connector-style-controls');
       var groupBtn = document.getElementById('btn-group-column');
       var imgDescBtn = document.getElementById('btn-toggle-img-desc');
+      var noteExtraCtrl = document.getElementById('note-extra-controls');
 
       if (selectedCardIds.length === 0 && !selectedConnectorId) {
         bar.classList.add('hidden');
@@ -3117,6 +3745,7 @@ firebase deploy --only hosting</pre>
         connControls.classList.add('flex');
         groupBtn.classList.add('hidden');
         if (imgDescBtn) { imgDescBtn.classList.add('hidden'); imgDescBtn.classList.remove('flex'); }
+        if (noteExtraCtrl) { noteExtraCtrl.classList.add('hidden'); noteExtraCtrl.classList.remove('flex'); }
       } else {
         countLbl.textContent = selectedCardIds.length + (selectedCardIds.length === 1 ? ' card' : ' cards');
         cardSwatches.classList.remove('hidden');
@@ -3131,6 +3760,15 @@ firebase deploy --only hosting</pre>
         if (imgDescBtn) {
           imgDescBtn.classList.toggle('hidden', !hasImageSelected);
           imgDescBtn.classList.toggle('flex', hasImageSelected);
+        }
+        var hasNoteSelected = false;
+        for (var ni = 0; ni < selectedCardIds.length; ni++) {
+          var nc = findCardById(selectedCardIds[ni]);
+          if (nc && nc.type === 'note') { hasNoteSelected = true; break; }
+        }
+        if (noteExtraCtrl) {
+          noteExtraCtrl.classList.toggle('hidden', !hasNoteSelected);
+          noteExtraCtrl.classList.toggle('flex', hasNoteSelected);
         }
       }
     }
@@ -3320,17 +3958,35 @@ firebase deploy --only hosting</pre>
       renderConnectors();
     }
 
-    function toggleSelectedConnectorCurve() {
+    function toggleSelectedConnectorLabel() {
       if (!selectedConnectorId) return;
-      var b = getCurrentBoard();
-      for (var i = 0; i < b.connectors.length; i++) {
-        if (b.connectors[i].id === selectedConnectorId) {
-          b.connectors[i].curved = (b.connectors[i].curved === false) ? true : false;
-          break;
-        }
-      }
+      var cn = findConnectorById(selectedConnectorId);
+      if (!cn) return;
+      cn.showLabel = !cn.showLabel;
+      if (!cn.showLabel) cn.label = '';
       saveWorkspaceToStorage();
       renderConnectors();
+      showToast(cn.showLabel ? 'Enabled arrow label' : 'Hidden arrow label');
+    }
+
+    function resetSelectedConnectorArch() {
+      if (!selectedConnectorId) return;
+      resetConnectorArchById(selectedConnectorId);
+    }
+
+    function resetConnectorArchById(connId) {
+      var cn = findConnectorById(connId);
+      if (!cn) return;
+      pushHistorySnapshot();
+      cn.bendX = 0;
+      cn.bendY = 0;
+      saveWorkspaceToStorage();
+      renderConnectors();
+      showToast('Reset arrow arch to straight line');
+    }
+
+    function toggleSelectedConnectorCurve() {
+      resetSelectedConnectorArch();
     }
 
     /*************************************************************************
@@ -3344,19 +4000,19 @@ firebase deploy --only hosting</pre>
       var btnConn = document.getElementById('btn-dock-connect');
 
       vp.classList.remove('panning', 'connecting-mode');
-      btnSel.className = 'px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/80 transition';
-      btnPan.className = 'px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/80 transition';
+      btnSel.className = 'btn-3d-key px-2.5 py-1 text-xs';
+      btnPan.className = 'btn-3d-key px-2.5 py-1 text-xs';
       btnConn.classList.remove('border-[#977ADC]', 'bg-[#23271A]');
 
       if (mode === 'pan') {
         vp.classList.add('panning');
-        btnPan.className = 'px-2 py-1 rounded-lg bg-[#977ADC] text-[#11130C] font-semibold transition';
+        btnPan.className = 'btn-3d-key btn-3d-key-active px-2.5 py-1 text-xs';
       } else if (mode === 'connect') {
         vp.classList.add('connecting-mode');
         btnConn.classList.add('border-[#977ADC]', 'bg-[#23271A]');
         showToast('Connect Mode: Drag from any card to another card');
       } else {
-        btnSel.className = 'px-2 py-1 rounded-lg bg-[#977ADC] text-[#11130C] font-semibold transition';
+        btnSel.className = 'btn-3d-key btn-3d-key-active px-2.5 py-1 text-xs';
       }
     }
 
@@ -3381,8 +4037,8 @@ firebase deploy --only hosting</pre>
       var btn = document.getElementById('btn-snap-toggle');
       btn.textContent = 'Snap: ' + (b.snapToGrid ? 'ON' : 'OFF');
       btn.className = b.snapToGrid
-        ? 'px-2 py-1 rounded-lg bg-[#23271A] text-[#E8ECDF] transition'
-        : 'px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/50 transition';
+        ? 'btn-3d-key px-2.5 py-1 text-xs font-semibold'
+        : 'btn-3d-key px-2.5 py-1 text-xs opacity-60';
       saveWorkspaceToStorage();
     }
 
@@ -3733,6 +4389,136 @@ firebase deploy --only hosting</pre>
     /*************************************************************************
      * TEMPLATES, EXPORT / IMPORT (.JSON & .MD)
      *************************************************************************/
+    var APPEARANCE_PRESETS = {
+      willnote: {
+        bgCanvas: '#E8ECDF',
+        bgTopbar: '#11130C',
+        bgSidebar: '#11130C',
+        accentPrimary: '#977ADC',
+        accentSecondary: '#CEBE7E',
+        cardIvory: '#F5F7F0',
+        fontKey: 'sans'
+      },
+      obsidian: {
+        bgCanvas: '#181A20',
+        bgTopbar: '#0D0E12',
+        bgSidebar: '#0D0E12',
+        accentPrimary: '#A78BFA',
+        accentSecondary: '#FBBF24',
+        cardIvory: '#242731',
+        fontKey: 'sans'
+      },
+      espresso: {
+        bgCanvas: '#F3EFE6',
+        bgTopbar: '#1E1815',
+        bgSidebar: '#1E1815',
+        accentPrimary: '#D97742',
+        accentSecondary: '#D4A359',
+        cardIvory: '#FAF7F2',
+        fontKey: 'serif'
+      },
+      nordic: {
+        bgCanvas: '#EAF0F6',
+        bgTopbar: '#0F172A',
+        bgSidebar: '#0F172A',
+        accentPrimary: '#38BDF8',
+        accentSecondary: '#818CF8',
+        cardIvory: '#FFFFFF',
+        fontKey: 'sans'
+      },
+      tactical: {
+        bgCanvas: '#E5E3DA',
+        bgTopbar: '#161912',
+        bgSidebar: '#161912',
+        accentPrimary: '#84A955',
+        accentSecondary: '#D4AF37',
+        cardIvory: '#F4F3EE',
+        fontKey: 'mono'
+      }
+    };
+
+    function ensureAppearanceState() {
+      if (!state.appearance) {
+        state.appearance = JSON.parse(JSON.stringify(APPEARANCE_PRESETS.willnote));
+      }
+      return state.appearance;
+    }
+
+    function applyAppearanceSettings() {
+      var ap = ensureAppearanceState();
+      var rootStyle = document.documentElement.style;
+      rootStyle.setProperty('--WN-sage', ap.bgCanvas || '#E8ECDF');
+      rootStyle.setProperty('--WN-topbar', ap.bgTopbar || '#11130C');
+      rootStyle.setProperty('--WN-sidebar', ap.bgSidebar || '#11130C');
+      rootStyle.setProperty('--WN-amethyst', ap.accentPrimary || '#977ADC');
+      rootStyle.setProperty('--WN-gold', ap.accentSecondary || '#CEBE7E');
+      rootStyle.setProperty('--WN-ivory', ap.cardIvory || '#F5F7F0');
+
+      // Automatically adjust default card ink color if user picked a dark card fill
+      var ivoryHex = (ap.cardIvory || '#F5F7F0').replace('#', '');
+      if (ivoryHex.length === 6) {
+        var r = parseInt(ivoryHex.substring(0, 2), 16) || 245;
+        var g = parseInt(ivoryHex.substring(2, 4), 16) || 247;
+        var b = parseInt(ivoryHex.substring(4, 6), 16) || 240;
+        var lum = (0.299 * r + 0.587 * g + 0.114 * b);
+        rootStyle.setProperty('--WN-obsidian', lum < 110 ? '#F5F7F0' : '#11130C');
+        rootStyle.setProperty('--WN-border', lum < 110 ? '#383D4B' : '#D2D8C5');
+      }
+
+      var fontMap = {
+        sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        serif: "Georgia, Cambria, 'Times New Roman', Times, serif",
+        mono: "'JetBrains Mono', 'Fira Code', Consolas, monospace"
+      };
+      rootStyle.setProperty('--WN-font', fontMap[ap.fontKey || 'sans'] || fontMap.sans);
+
+      // Sync color inputs if modal is open
+      var cBg = document.getElementById('clr-canvas-bg');
+      var tBg = document.getElementById('clr-topbar-bg');
+      var sBg = document.getElementById('clr-sidebar-bg');
+      var aPr = document.getElementById('clr-accent-primary');
+      var aSc = document.getElementById('clr-accent-secondary');
+      var cIv = document.getElementById('clr-card-ivory');
+      if (cBg) cBg.value = ap.bgCanvas || '#E8ECDF';
+      if (tBg) tBg.value = ap.bgTopbar || '#11130C';
+      if (sBg) sBg.value = ap.bgSidebar || '#11130C';
+      if (aPr) aPr.value = ap.accentPrimary || '#977ADC';
+      if (aSc) aSc.value = ap.accentSecondary || '#CEBE7E';
+      if (cIv) cIv.value = ap.cardIvory || '#F5F7F0';
+    }
+
+    function openAppearanceModal() {
+      applyAppearanceSettings();
+      document.getElementById('modal-appearance').classList.remove('hidden');
+    }
+
+    function closeAppearanceModal() {
+      document.getElementById('modal-appearance').classList.add('hidden');
+    }
+
+    function applyAppearancePreset(presetKey) {
+      var preset = APPEARANCE_PRESETS[presetKey] || APPEARANCE_PRESETS.willnote;
+      state.appearance = JSON.parse(JSON.stringify(preset));
+      applyAppearanceSettings();
+      saveWorkspaceToStorage();
+      showToast('Applied "' + presetKey.toUpperCase() + '" theme');
+    }
+
+    function updateAppearanceColor(field, hexValue) {
+      var ap = ensureAppearanceState();
+      ap[field] = hexValue;
+      applyAppearanceSettings();
+      saveWorkspaceToStorage();
+    }
+
+    function updateAppearanceFont(fontKey) {
+      var ap = ensureAppearanceState();
+      ap.fontKey = fontKey;
+      applyAppearanceSettings();
+      saveWorkspaceToStorage();
+      showToast('Updated workspace font to ' + fontKey.toUpperCase());
+    }
+
     function openTemplatesModal() {
       document.getElementById('modal-templates').classList.remove('hidden');
     }
