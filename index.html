@@ -1,0 +1,4139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Willnote — Personal Visual Workspace & Infinite Canvas</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --WN-sage: #E8ECDF;
+      --WN-gold: #CEBE7E;
+      --WN-obsidian: #11130C;
+      --WN-amethyst: #977ADC;
+      --WN-ivory: #F5F7F0;
+      --WN-border: #D2D8C5;
+      --WN-obsidian-soft: #1C1F15;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    input, textarea, [contenteditable="true"], .selectable-text {
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--WN-sage);
+      color: var(--WN-obsidian);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Infinite Canvas Surface */
+    #canvas-viewport {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--WN-sage);
+      cursor: default;
+      touch-action: none;
+    }
+
+    #canvas-viewport.panning {
+      cursor: grab !important;
+    }
+    #canvas-viewport.panning-active {
+      cursor: grabbing !important;
+    }
+    #canvas-viewport.connecting-mode {
+      cursor: crosshair !important;
+    }
+
+    .grid-dots {
+      background-image: radial-gradient(rgba(17, 19, 12, 0.16) 1.25px, transparent 1.25px);
+      background-size: 24px 24px;
+    }
+
+    .grid-lines {
+      background-image:
+        linear-gradient(to right, rgba(17, 19, 12, 0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(17, 19, 12, 0.07) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    .grid-blank {
+      background-image: none;
+    }
+
+    #canvas-world {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 1px;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    /* Spatial Cards */
+    .wn-card {
+      position: absolute;
+      border-radius: 12px;
+      transition: box-shadow 0.16s ease, border-color 0.16s ease;
+      box-shadow: 0 4px 16px -4px rgba(17, 19, 12, 0.08), 0 2px 6px -1px rgba(17, 19, 12, 0.05);
+    }
+
+    .wn-card:hover {
+      box-shadow: 0 10px 26px -6px rgba(17, 19, 12, 0.14), 0 4px 10px -2px rgba(17, 19, 12, 0.07);
+    }
+
+    .wn-card.selected {
+      outline: 2.5px solid var(--WN-amethyst);
+      outline-offset: 2px;
+      box-shadow: 0 14px 32px -6px rgba(151, 122, 220, 0.28), 0 4px 12px -2px rgba(17, 19, 12, 0.12);
+    }
+
+    .wn-card.drop-target-active {
+      outline: 3px dashed var(--WN-amethyst) !important;
+      outline-offset: 4px;
+      transform: scale(1.02);
+    }
+
+    /* Card Color Themes */
+    .theme-ivory {
+      background-color: #F5F7F0;
+      border: 1px solid #D2D8C5;
+      color: #11130C;
+    }
+    .theme-sage {
+      background-color: #E2E7D5;
+      border: 1px solid #C2C9B2;
+      color: #11130C;
+    }
+    .theme-gold {
+      background-color: #CEBE7E;
+      border: 1px solid #B5A462;
+      color: #11130C;
+    }
+    .theme-obsidian {
+      background-color: #11130C;
+      border: 1px solid #2D3223;
+      color: #E8ECDF;
+    }
+    .theme-amethyst {
+      background-color: #EFEAF9;
+      border: 1px solid #C5B4EE;
+      color: #11130C;
+    }
+
+    /* Connection Anchor Ports on all 4 sides */
+    .conn-port {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 9999px;
+      background-color: var(--WN-ivory);
+      border: 2.5px solid var(--WN-amethyst);
+      opacity: 0;
+      transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+      z-index: 30;
+      cursor: crosshair;
+    }
+    .wn-card:hover .conn-port,
+    #canvas-viewport.connecting-mode .conn-port {
+      opacity: 1;
+    }
+    .conn-port:hover {
+      background-color: var(--WN-amethyst);
+      transform: scale(1.35);
+    }
+    .conn-port-top { top: -6px; left: calc(50% - 6px); }
+    .conn-port-right { right: -6px; top: calc(50% - 6px); }
+    .conn-port-bottom { bottom: -6px; left: calc(50% - 6px); }
+    .conn-port-left { left: -6px; top: calc(50% - 6px); }
+
+    /* Resize Handle */
+    .resize-handle {
+      position: absolute;
+      right: 2px;
+      bottom: 2px;
+      width: 16px;
+      height: 16px;
+      cursor: nwse-resize;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      z-index: 25;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wn-card:hover .resize-handle,
+    .wn-card.selected .resize-handle {
+      opacity: 0.75;
+    }
+    .resize-handle:hover {
+      opacity: 1 !important;
+    }
+
+    /* Dock Item Drag Styling */
+    .dock-btn {
+      transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .dock-btn:hover {
+      background-color: #23271A;
+      color: #CEBE7E;
+      transform: translateY(-1px);
+    }
+    .dock-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(17, 19, 12, 0.22);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(151, 122, 220, 0.65);
+    }
+
+    /* Rich Note Content Formatting */
+    .note-editor:empty:before {
+      content: attr(data-placeholder);
+      color: rgba(17, 19, 12, 0.38);
+      pointer-events: none;
+    }
+    .theme-obsidian .note-editor:empty:before {
+      color: rgba(232, 236, 223, 0.42);
+    }
+    .note-editor h1 { font-size: 1.25rem; font-weight: 700; margin: 0.25rem 0; line-height: 1.3; }
+    .note-editor h2 { font-size: 1.05rem; font-weight: 600; margin: 0.2rem 0; }
+    .note-editor blockquote {
+      border-left: 3px solid var(--WN-amethyst);
+      padding-left: 0.65rem;
+      margin: 0.35rem 0;
+      opacity: 0.85;
+      font-style: italic;
+    }
+    .note-editor ul {
+      list-style-type: disc;
+      padding-left: 1.25rem;
+      margin: 0.25rem 0;
+    }
+    .note-editor code {
+      background: rgba(151, 122, 220, 0.16);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85em;
+    }
+
+    @keyframes dashFlow {
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+    .connector-dashed {
+      animation: dashFlow 1.2s linear infinite;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen w-screen overflow-hidden select-none">
+
+  <!-- TOP NAVIGATION, LOGO, BREADCRUMBS & CONTEXTUAL TOOLBAR -->
+  <header class="h-14 bg-[#11130C] text-[#E8ECDF] border-b border-[#282C1E] px-3 flex items-center justify-between z-40 shrink-0 shadow-md">
+    <!-- Left: Custom Creative Willnote Logo + Breadcrumb Navigation -->
+    <div class="flex items-center gap-3 min-w-0">
+      <button id="btn-home-logo" onclick="navigateToBoard('root')" class="flex items-center gap-2.5 group focus:outline-none" title="Return to Main Workspace Board">
+        <!-- Custom Creative Willnote Inline SVG Logo -->
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0 transition-transform duration-200 group-hover:scale-105">
+          <rect x="1" y="1" width="38" height="38" rx="10" fill="#181B11" stroke="#CEBE7E" stroke-width="1.5"/>
+          <!-- Back spatial card in Antique Gold -->
+          <rect x="7" y="9" width="13" height="17" rx="3.5" transform="rotate(-8 7 9)" fill="#CEBE7E"/>
+          <!-- Front spatial card in Alabaster Sage -->
+          <rect x="19" y="12" width="13" height="17" rx="3.5" transform="rotate(6 19 12)" fill="#E8ECDF"/>
+          <!-- Geometric W & Bezier Connector Path in Amethyst -->
+          <path d="M9.5 14.5L13 26.5L19.5 17.5L25.5 26.5L30.5 13.5" stroke="#11130C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9.5 14.5L13 26.5L19.5 17.5L25.5 26.5L30.5 13.5" stroke="#977ADC" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Glowing Amethyst Node Spark -->
+          <circle cx="30.5" cy="13.5" r="3.2" fill="#977ADC" stroke="#E8ECDF" stroke-width="1.2"/>
+          <circle cx="9.5" cy="14.5" r="2.3" fill="#CEBE7E"/>
+        </svg>
+        <div class="flex flex-col text-left">
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold tracking-tight text-base text-[#E8ECDF] leading-none">Willnote</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-[#977ADC]"></span>
+            <span class="text-[10px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-[#23271A] text-[#CEBE7E] border border-[#CEBE7E]/30">Unlimited</span>
+          </div>
+          <span class="text-[10px] text-[#E8ECDF]/60 leading-tight mt-0.5 hidden sm:inline">Personal Spatial Studio</span>
+        </div>
+      </button>
+
+      <div class="h-5 w-[1px] bg-[#2D3223] mx-1 hidden sm:block"></div>
+
+      <!-- Hierarchical Breadcrumbs -->
+      <nav id="breadcrumb-bar" class="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto no-scrollbar py-1 max-w-[260px] md:max-w-[420px]">
+        <!-- Rendered dynamically -->
+      </nav>
+    </div>
+
+    <!-- Center: Dynamic Contextual Selection Bar (Appears when cards or connectors are selected) -->
+    <div id="context-selection-bar" class="hidden items-center gap-1.5 bg-[#1B1E14] border border-[#977ADC]/40 px-2.5 py-1 rounded-lg shadow-inner">
+      <span id="selection-count-label" class="text-xs font-semibold text-[#977ADC] mr-1">1 selected</span>
+      <!-- Card Theme Swatches -->
+      <div id="card-color-swatches" class="flex items-center gap-1 border-r border-[#2D3223] pr-2 mr-1">
+        <button onclick="setSelectedCardsTheme('ivory')" class="w-4 h-4 rounded-full bg-[#F5F7F0] border border-[#11130C]/40 hover:scale-125 transition" title="Elevated Ivory (#F5F7F0)"></button>
+        <button onclick="setSelectedCardsTheme('sage')" class="w-4 h-4 rounded-full bg-[#E8ECDF] border border-[#11130C]/40 hover:scale-125 transition" title="Alabaster Sage (#E8ECDF)"></button>
+        <button onclick="setSelectedCardsTheme('gold')" class="w-4 h-4 rounded-full bg-[#CEBE7E] border border-[#11130C]/40 hover:scale-125 transition" title="Antique Ochre Gold (#CEBE7E)"></button>
+        <button onclick="setSelectedCardsTheme('obsidian')" class="w-4 h-4 rounded-full bg-[#11130C] border border-[#CEBE7E] hover:scale-125 transition" title="Obsidian Olive-Black (#11130C)"></button>
+        <button onclick="setSelectedCardsTheme('amethyst')" class="w-4 h-4 rounded-full bg-[#977ADC] border border-[#E8ECDF]/60 hover:scale-125 transition" title="Amethyst Lavender Tint (#977ADC)"></button>
+      </div>
+
+      <!-- Connector Controls (Shown when a connector is selected) -->
+      <div id="connector-style-controls" class="hidden items-center gap-1.5 border-r border-[#2D3223] pr-2 mr-1">
+        <button onclick="setSelectedConnectorColor('#977ADC')" class="w-4 h-4 rounded-full bg-[#977ADC] border border-white/40" title="Amethyst Line"></button>
+        <button onclick="setSelectedConnectorColor('#CEBE7E')" class="w-4 h-4 rounded-full bg-[#CEBE7E] border border-white/40" title="Antique Gold Line"></button>
+        <button onclick="setSelectedConnectorColor('#11130C')" class="w-4 h-4 rounded-full bg-[#11130C] border border-[#E8ECDF]" title="Obsidian Line"></button>
+        <button onclick="toggleSelectedConnectorDash()" class="px-1.5 py-0.5 text-[11px] rounded bg-[#282C1E] hover:bg-[#977ADC] hover:text-[#11130C] transition" title="Toggle Solid / Animated Dashed Line">Dash</button>
+        <button onclick="toggleSelectedConnectorCurve()" class="px-1.5 py-0.5 text-[11px] rounded bg-[#282C1E] hover:bg-[#977ADC] hover:text-[#11130C] transition" title="Toggle Bezier Curve / Straight Line">Curve</button>
+      </div>
+
+      <button id="btn-toggle-img-desc" onclick="toggleSelectedImagesDescription()" class="hidden px-2 py-1 text-xs rounded bg-[#25291C] hover:bg-[#977ADC] hover:text-[#11130C] transition items-center gap-1" title="Show or Hide Title & Description Under Selected Image(s)">
+        <span>Image Text</span>
+      </button>
+      <button id="btn-group-column" onclick="groupSelectedIntoColumn()" class="px-2 py-1 text-xs rounded bg-[#25291C] hover:bg-[#CEBE7E] hover:text-[#11130C] transition flex items-center gap-1" title="Group Selected Cards into a Vertical Column">
+        <span>Stack in Column</span>
+      </button>
+      <button onclick="duplicateSelectedCards()" class="px-2 py-1 text-xs rounded bg-[#25291C] hover:bg-[#977ADC] hover:text-[#11130C] transition" title="Duplicate Selected (Ctrl+D)">Duplicate</button>
+      <button onclick="toggleLockSelectedCards()" class="px-2 py-1 text-xs rounded bg-[#25291C] hover:bg-[#CEBE7E] hover:text-[#11130C] transition" title="Lock / Unlock Card Position">Lock</button>
+      <button onclick="bringSelectedToFront()" class="px-2 py-1 text-xs rounded bg-[#25291C] hover:bg-[#2D3223] transition" title="Bring to Front">Front</button>
+      <button onclick="deleteSelectedItems()" class="px-2 py-1 text-xs rounded bg-red-950/70 text-red-200 hover:bg-red-600 hover:text-white transition" title="Move Selected to Trash (Del)">Delete</button>
+    </div>
+
+    <!-- Right: Global Search, Undo/Redo, Templates, Cloud Sync, Export, Unsorted Inbox -->
+    <div class="flex items-center gap-1.5">
+      <!-- Undo / Redo -->
+      <div class="hidden md:flex items-center bg-[#1A1D12] border border-[#2D3223] rounded-lg p-0.5">
+        <button id="btn-undo" onclick="undoAction()" class="p-1.5 rounded hover:bg-[#282C1E] text-[#E8ECDF]/80 hover:text-[#E8ECDF] disabled:opacity-30 transition" title="Undo (Ctrl+Z)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+        </button>
+        <button id="btn-redo" onclick="redoAction()" class="p-1.5 rounded hover:bg-[#282C1E] text-[#E8ECDF]/80 hover:text-[#E8ECDF] disabled:opacity-30 transition" title="Redo (Ctrl+Y)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"/></svg>
+        </button>
+      </div>
+
+      <!-- Global Search (Ctrl+K) -->
+      <button onclick="openSearchModal()" class="flex items-center gap-2 bg-[#1A1D12] hover:bg-[#25291C] border border-[#2D3223] px-2.5 py-1.5 rounded-lg text-xs text-[#E8ECDF]/80 hover:text-[#E8ECDF] transition" title="Search All Boards & Cards (Ctrl+K)">
+        <svg class="w-3.5 h-3.5 text-[#977ADC]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <span class="hidden lg:inline">Search</span>
+        <kbd class="hidden sm:inline text-[10px] px-1 py-0.5 bg-[#11130C] text-[#CEBE7E] rounded border border-[#2D3223]">⌘K</kbd>
+      </button>
+
+      <!-- Board Templates -->
+      <button onclick="openTemplatesModal()" class="flex items-center gap-1.5 bg-[#1A1D12] hover:bg-[#25291C] border border-[#2D3223] px-2.5 py-1.5 rounded-lg text-xs text-[#CEBE7E] transition" title="Load or Add Board Templates">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+        <span class="hidden md:inline font-medium">Templates</span>
+      </button>
+
+      <!-- Firebase Cloud Sync & Deploy Button -->
+      <button id="btn-cloud-sync" onclick="openFirebaseModal()" class="flex items-center gap-1.5 bg-[#977ADC]/20 hover:bg-[#977ADC]/30 border border-[#977ADC]/50 px-2.5 py-1.5 rounded-lg text-xs text-[#E8ECDF] transition" title="Configure Firebase Cloud Sync & Hosting">
+        <span id="sync-status-dot" class="w-2 h-2 rounded-full bg-[#CEBE7E]"></span>
+        <span id="sync-status-text" class="font-medium hidden sm:inline">Local Saved</span>
+      </button>
+
+      <!-- Backup & Export -->
+      <button onclick="openExportModal()" class="p-1.5 bg-[#1A1D12] hover:bg-[#25291C] border border-[#2D3223] rounded-lg text-[#E8ECDF]/80 hover:text-[#CEBE7E] transition" title="Export / Import Workspace (.json / .md)">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      </button>
+
+      <!-- Unsorted Quick-Capture Inbox Drawer Toggle -->
+      <button onclick="toggleUnsortedDrawer()" class="relative flex items-center gap-1.5 bg-[#CEBE7E] hover:bg-[#d8c98e] text-[#11130C] font-semibold px-2.5 py-1.5 rounded-lg text-xs transition shadow-sm" title="Toggle Quick-Capture Inbox Drawer">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+        <span class="hidden sm:inline">Inbox</span>
+        <span id="unsorted-count-badge" class="px-1.5 py-0.2 bg-[#11130C] text-[#E8ECDF] rounded-full text-[10px] font-bold">2</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE BODY: LEFT CREATION DOCK + INFINITE CANVAS + SLIDE-OUT DRAWERS -->
+  <div class="relative flex-1 flex overflow-hidden">
+
+    <!-- LEFT MILANOTE-STYLE DRAG & CLICK CREATION DOCK (#11130C) -->
+    <aside class="w-16 bg-[#11130C] text-[#E8ECDF] border-r border-[#282C1E] flex flex-col items-center py-2.5 justify-between z-30 shrink-0 shadow-xl overflow-y-auto no-scrollbar">
+      <div class="flex flex-col items-center gap-1.5 w-full px-1.5">
+        <div class="text-[9px] uppercase tracking-wider text-[#CEBE7E]/70 font-semibold mb-0.5">Drag/Click</div>
+
+        <!-- Sub-Board Tool -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'board')" onclick="createCardFromDock('board')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag onto canvas or click to add a Nested Sub-Board">
+          <div class="w-7 h-7 rounded-lg bg-[#977ADC]/20 border border-[#977ADC]/50 flex items-center justify-center text-[#977ADC]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+          </div>
+          <span class="text-[10px] font-medium leading-none">Board</span>
+        </button>
+
+        <!-- Note Card Tool -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'note')" onclick="createCardFromDock('note')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Rich Note Card">
+          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#E8ECDF]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <span class="text-[10px] font-medium leading-none">Note</span>
+        </button>
+
+        <!-- To-Do Checklist Tool -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'todo')" onclick="createCardFromDock('todo')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add an Interactive To-Do List">
+          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#CEBE7E]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+          </div>
+          <span class="text-[10px] font-medium leading-none">To-Do</span>
+        </button>
+
+        <!-- Column Container Tool -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'column')" onclick="createCardFromDock('column')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Vertical Column Container">
+          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#E8ECDF]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+          </div>
+          <span class="text-[10px] font-medium leading-none">Column</span>
+        </button>
+
+        <!-- Image / Media Card Tool -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'image')" onclick="createCardFromDock('image')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add an Image / Visual Card">
+          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#977ADC]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <span class="text-[10px] font-medium leading-none">Image</span>
+        </button>
+
+        <!-- Link / Bookmark Tool -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'link')" onclick="createCardFromDock('link')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Web Bookmark Card">
+          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center text-[#CEBE7E]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+          </div>
+          <span class="text-[10px] font-medium leading-none">Link</span>
+        </button>
+
+        <!-- Color Swatch Tool -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'swatch')" onclick="createCardFromDock('swatch')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Moodboard Color Swatch">
+          <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-[#CEBE7E] to-[#977ADC] p-0.5 flex items-center justify-center">
+            <div class="w-full h-full bg-[#11130C]/40 rounded-[6px] flex items-center justify-center text-white">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+            </div>
+          </div>
+          <span class="text-[10px] font-medium leading-none">Swatch</span>
+        </button>
+
+        <!-- Section Header Tool -->
+        <button draggable="true" ondragstart="onDockDragStart(event, 'header')" onclick="createCardFromDock('header')" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]" title="Drag or click to add a Canvas Section Header">
+          <div class="w-7 h-7 rounded-lg bg-[#E8ECDF]/10 border border-[#E8ECDF]/30 flex items-center justify-center font-bold text-xs text-[#E8ECDF]">
+            H1
+          </div>
+          <span class="text-[10px] font-medium leading-none">Header</span>
+        </button>
+
+        <!-- Connector Line Tool -->
+        <button id="btn-dock-connect" onclick="toggleConnectMode()" class="dock-btn w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF] border border-transparent" title="Toggle Arrow Connector Mode (or drag any card's purple side port)">
+          <div class="w-7 h-7 rounded-lg bg-[#977ADC]/20 border border-[#977ADC]/50 flex items-center justify-center text-[#977ADC]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          </div>
+          <span class="text-[10px] font-medium leading-none">Line</span>
+        </button>
+      </div>
+
+      <!-- Bottom: Trash Drawer Trigger -->
+      <div class="flex flex-col items-center gap-2 w-full px-1.5 pt-2 border-t border-[#282C1E]">
+        <button onclick="openTrashModal()" class="dock-btn relative w-full py-2 rounded-xl flex flex-col items-center gap-1 text-[#E8ECDF]/70 hover:text-[#CEBE7E]" title="View Trash & Restore Deleted Items">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          <span class="text-[10px] font-medium leading-none">Trash</span>
+          <span id="trash-count-badge" class="hidden absolute top-1 right-2 w-4 h-4 rounded-full bg-[#977ADC] text-[#11130C] text-[9px] font-bold items-center justify-center">0</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- INFINITE SPATIAL CANVAS VIEWPORT -->
+    <main id="canvas-viewport" class="grid-dots flex-1 relative" ondragover="onCanvasDragOver(event)" ondrop="onCanvasDrop(event)">
+
+      <!-- Hardware-Accelerated Transform World -->
+      <div id="canvas-world">
+        <!-- SVG Layer for Bezier Connectors & Live Dragging Line -->
+        <svg id="connections-svg" class="overflow-visible pointer-events-auto" style="position:absolute; top:0; left:0; width:1px; height:1px; z-index:5;">
+          <defs>
+            <marker id="arrow-amethyst" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,7 L8,3.5 z" fill="#977ADC" />
+            </marker>
+            <marker id="arrow-gold" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,7 L8,3.5 z" fill="#CEBE7E" />
+            </marker>
+            <marker id="arrow-obsidian" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,7 L8,3.5 z" fill="#11130C" />
+            </marker>
+          </defs>
+          <g id="connectors-layer"></g>
+          <path id="temp-connector-path" d="" fill="none" stroke="#977ADC" stroke-width="2.5" stroke-dasharray="6,4" marker-end="url(#arrow-amethyst)" class="hidden pointer-events-none" />
+        </svg>
+
+        <!-- Smart Alignment Guides Layer -->
+        <div id="smart-guides-layer" class="pointer-events-none" style="position:absolute; top:0; left:0; width:1px; height:1px; z-index:40;"></div>
+
+        <!-- Cards Container -->
+        <div id="cards-layer" style="position:absolute; top:0; left:0; z-index:10;"></div>
+      </div>
+
+      <!-- Rubber-Band Marquee Selection Box -->
+      <div id="marquee-box" class="hidden pointer-events-none absolute border-2 border-[#977ADC] bg-[#977ADC]/15 rounded z-40"></div>
+
+      <!-- Double-Click Radial Quick-Spawn Menu -->
+      <div id="quick-spawn-menu" class="hidden absolute z-50 bg-[#11130C] text-[#E8ECDF] border border-[#CEBE7E]/40 rounded-2xl shadow-2xl p-2 w-60">
+        <div class="flex items-center justify-between px-2 py-1 border-b border-[#282C1E] mb-1.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-[#CEBE7E]">Add to Canvas Here</span>
+          <button onclick="closeQuickSpawnMenu()" class="text-xs text-[#E8ECDF]/60 hover:text-white">✕</button>
+        </div>
+        <div class="grid grid-cols-2 gap-1 text-xs">
+          <button onclick="spawnFromQuickMenu('note')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#E8ECDF]"></span>Rich Note</button>
+          <button onclick="spawnFromQuickMenu('todo')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#CEBE7E]"></span>To-Do List</button>
+          <button onclick="spawnFromQuickMenu('board')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#977ADC]"></span>Sub-Board</button>
+          <button onclick="spawnFromQuickMenu('column')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#CEBE7E]"></span>Column</button>
+          <button onclick="spawnFromQuickMenu('image')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#977ADC]"></span>Image Card</button>
+          <button onclick="spawnFromQuickMenu('link')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#CEBE7E]"></span>Bookmark</button>
+          <button onclick="spawnFromQuickMenu('swatch')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#977ADC]"></span>Color Swatch</button>
+          <button onclick="spawnFromQuickMenu('header')" class="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-[#23271A] text-left transition"><span class="w-2 h-2 rounded-full bg-[#E8ECDF]"></span>Header Title</button>
+        </div>
+      </div>
+
+      <!-- Bottom-Left Canvas Mode, Grid & Snap Controls -->
+      <div class="absolute bottom-4 left-4 z-30 flex items-center gap-1.5 bg-[#11130C]/95 backdrop-blur-md text-[#E8ECDF] px-2.5 py-1.5 rounded-xl border border-[#2D3223] shadow-lg text-xs">
+        <button id="btn-mode-select" onclick="setInteractionMode('select')" class="px-2 py-1 rounded-lg bg-[#977ADC] text-[#11130C] font-semibold transition" title="Pointer / Marquee Select Mode (V)">Select</button>
+        <button id="btn-mode-pan" onclick="setInteractionMode('pan')" class="px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/80 transition" title="Hand Pan Mode (H or Hold Spacebar)">Pan</button>
+        <div class="h-4 w-[1px] bg-[#2D3223] mx-0.5"></div>
+        <button id="btn-grid-toggle" onclick="cycleGridMode()" class="px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#CEBE7E] transition" title="Cycle Canvas Background: Dots / Lines / Blank">Grid: Dots</button>
+        <button id="btn-snap-toggle" onclick="toggleSnapToGrid()" class="px-2 py-1 rounded-lg bg-[#23271A] text-[#E8ECDF] transition" title="Toggle 16px Magnetic Snap-to-Grid">Snap: ON</button>
+        <div class="hidden sm:flex items-center gap-1 pl-2 border-l border-[#2D3223] text-[11px] text-[#E8ECDF]/70">
+          <span id="board-stats-pill">0 cards</span>
+        </div>
+      </div>
+
+      <!-- Bottom-Right Zoom Bar & Interactive Minimap Radar -->
+      <div class="absolute bottom-4 right-4 z-30 flex flex-col items-end gap-2">
+        <!-- Minimap Radar -->
+        <div id="minimap-container" class="bg-[#11130C]/95 border border-[#2D3223] rounded-xl p-2 shadow-xl w-44 h-28 relative overflow-hidden cursor-pointer" onclick="onMinimapClick(event)" title="Click anywhere on radar to jump viewport">
+          <div class="flex items-center justify-between text-[9px] uppercase tracking-wider text-[#CEBE7E]/80 mb-1 pointer-events-none">
+            <span>Spatial Radar</span>
+            <span id="minimap-coords">0, 0</span>
+          </div>
+          <div id="minimap-canvas" class="relative w-full h-20 bg-[#1B1E14] rounded border border-[#2D3223] overflow-hidden">
+            <div id="minimap-items"></div>
+            <div id="minimap-viewport-rect" class="absolute border border-[#977ADC] bg-[#977ADC]/20 rounded-sm pointer-events-none"></div>
+          </div>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="flex items-center gap-1 bg-[#11130C]/95 backdrop-blur-md text-[#E8ECDF] px-2 py-1 rounded-xl border border-[#2D3223] shadow-lg text-xs">
+          <button onclick="toggleMinimap()" class="px-2 py-1 rounded hover:bg-[#23271A] text-[#CEBE7E] font-medium" title="Show / Hide Minimap Radar">Radar</button>
+          <div class="h-4 w-[1px] bg-[#2D3223]"></div>
+          <button onclick="zoomByStep(-0.15)" class="w-6 h-6 rounded hover:bg-[#23271A] flex items-center justify-center font-bold" title="Zoom Out">−</button>
+          <button id="zoom-readout" onclick="resetZoom()" class="px-2 py-0.5 rounded hover:bg-[#23271A] font-mono text-[11px] text-[#E8ECDF]" title="Click to Reset Zoom to 100%">100%</button>
+          <button onclick="zoomByStep(0.15)" class="w-6 h-6 rounded hover:bg-[#23271A] flex items-center justify-center font-bold" title="Zoom In">+</button>
+          <div class="h-4 w-[1px] bg-[#2D3223]"></div>
+          <button onclick="fitAllCardsToViewport()" class="px-2 py-1 rounded hover:bg-[#977ADC] hover:text-[#11130C] font-medium transition" title="Center & Fit All Cards on Screen">Fit All</button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- RIGHT SLIDE-OUT QUICK-CAPTURE UNSORTED INBOX DRAWER -->
+    <aside id="unsorted-drawer" class="hidden w-80 bg-[#11130C] text-[#E8ECDF] border-l border-[#282C1E] flex-col z-30 shadow-2xl shrink-0">
+      <div class="p-3.5 border-b border-[#282C1E] flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-[#CEBE7E]">Unsorted Quick Inbox</h3>
+          <p class="text-[11px] text-[#E8ECDF]/60">Jot quick ideas & drop them onto any board</p>
+        </div>
+        <button onclick="toggleUnsortedDrawer()" class="p-1 rounded hover:bg-[#23271A] text-[#E8ECDF]/60 hover:text-white">✕</button>
+      </div>
+
+      <div class="p-3 border-b border-[#282C1E] bg-[#181B11]">
+        <textarea id="unsorted-input" rows="2" placeholder="Capture a quick note, link, or task..." class="w-full bg-[#11130C] text-[#E8ECDF] border border-[#2D3223] focus:border-[#977ADC] rounded-lg p-2 text-xs focus:outline-none resize-none"></textarea>
+        <div class="flex justify-end mt-2">
+          <button onclick="addUnsortedItem()" class="bg-[#977ADC] hover:bg-[#a88ee6] text-[#11130C] font-semibold px-3 py-1.5 rounded-lg text-xs transition">Save to Inbox</button>
+        </div>
+      </div>
+
+      <div id="unsorted-list" class="flex-1 overflow-y-auto p-3 space-y-2.5">
+        <!-- Populated dynamically -->
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- HIDDEN FILE INPUT FOR IMAGE CARDS & JSON RESTORE -->
+  <input type="file" id="hidden-image-input" accept="image/*" class="hidden" onchange="handleImageFileSelected(event)" />
+  <input type="file" id="hidden-json-input" accept=".json,application/json" class="hidden" onchange="handleJsonImportSelected(event)" />
+
+  <!-- MODAL 1: GLOBAL SEARCH & COMMAND PALETTE (Ctrl+K) -->
+  <div id="modal-search" class="hidden fixed inset-0 bg-[#11130C]/75 backdrop-blur-sm z-50 flex items-start justify-center pt-20 p-4">
+    <div class="bg-[#11130C] text-[#E8ECDF] border border-[#CEBE7E]/40 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-3.5 border-b border-[#282C1E] flex items-center gap-2.5">
+        <svg class="w-5 h-5 text-[#977ADC]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input id="search-query-input" type="text" oninput="renderSearchResults()" placeholder="Search boards, notes, tasks, columns, or hex codes..." class="flex-1 bg-transparent text-sm text-[#E8ECDF] focus:outline-none" />
+        <button onclick="closeSearchModal()" class="text-xs px-2 py-1 rounded bg-[#23271A] text-[#E8ECDF]/70 hover:text-white">ESC</button>
+      </div>
+      <div id="search-results-list" class="max-h-80 overflow-y-auto p-2 divide-y divide-[#23271A]">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: FIREBASE CLOUD SYNC & ONE-CLICK DEPLOYMENT SETUP -->
+  <div id="modal-firebase" class="hidden fixed inset-0 bg-[#11130C]/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#11130C] text-[#E8ECDF] border border-[#977ADC]/50 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="p-4 border-b border-[#282C1E] flex items-center justify-between bg-[#171A10]">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-[#977ADC]/20 border border-[#977ADC] flex items-center justify-center text-[#977ADC] font-bold">☁</div>
+          <div>
+            <h3 class="text-base font-bold text-[#E8ECDF]">Firebase Cloud Sync & Hosting Setup</h3>
+            <p class="text-xs text-[#CEBE7E]">Access your Willnote boards everywhere with real-time Firestore sync</p>
+          </div>
+        </div>
+        <button onclick="closeFirebaseModal()" class="p-1.5 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/70 hover:text-white">✕</button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4 text-xs">
+        <div class="p-3.5 rounded-xl bg-[#1B1E14] border border-[#2D3223] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <div class="font-semibold text-[#CEBE7E] text-sm">Current Persistence Status</div>
+            <p id="firebase-modal-status" class="text-[#E8ECDF]/80 mt-0.5">Offline-First Local Storage Active (Auto-saving every change in browser storage).</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="manualCloudPush()" class="px-3 py-1.5 rounded-lg bg-[#977ADC] text-[#11130C] font-semibold hover:opacity-90 transition">Push to Cloud</button>
+            <button onclick="manualCloudPull()" class="px-3 py-1.5 rounded-lg bg-[#23271A] border border-[#CEBE7E]/40 text-[#CEBE7E] font-semibold hover:bg-[#2D3223] transition">Pull from Cloud</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label class="block font-semibold text-[#E8ECDF]">1. Paste Firebase Config JSON (or Object)</label>
+            <textarea id="firebase-config-input" rows="7" placeholder='{"apiKey": "AIza...", "authDomain": "your-app.firebaseapp.com", "projectId": "your-app", "storageBucket": "your-app.appspot.com", "appId": "1:123..."}' class="w-full font-mono text-[11px] bg-[#181B11] text-[#E8ECDF] border border-[#2D3223] rounded-xl p-2.5 focus:border-[#977ADC] focus:outline-none"></textarea>
+            <label class="block font-semibold text-[#E8ECDF] pt-1">Workspace Document Key / Passphrase</label>
+            <input id="firebase-workspace-key" type="text" value="willnote-personal-main" placeholder="e.g. willnote-personal-main" class="w-full font-mono text-xs bg-[#181B11] text-[#E8ECDF] border border-[#2D3223] rounded-lg px-3 py-2 focus:border-[#977ADC] focus:outline-none" />
+          </div>
+
+          <div class="space-y-3 bg-[#181B11] p-3.5 rounded-xl border border-[#2D3223]">
+            <div class="font-semibold text-[#CEBE7E] text-sm">2. Deploy Willnote to Firebase Hosting</div>
+            <p class="text-[#E8ECDF]/75 leading-relaxed">This single HTML file is 100% self-contained. Save it as <code class="text-[#977ADC]">public/index.html</code> and deploy in 3 commands:</p>
+            <pre class="bg-[#11130C] p-2.5 rounded-lg text-[11px] text-[#E8ECDF] font-mono overflow-x-auto border border-[#282C1E]">npm install -g firebase-tools
+firebase login &amp;&amp; firebase init hosting
+firebase deploy --only hosting</pre>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button onclick="downloadFirebaseJsonConfig()" class="px-3 py-1.5 rounded-lg bg-[#23271A] hover:bg-[#CEBE7E] hover:text-[#11130C] text-[#CEBE7E] font-medium transition">Download firebase.json</button>
+              <button onclick="copyDeployCommands()" class="px-3 py-1.5 rounded-lg bg-[#23271A] hover:bg-[#977ADC] hover:text-[#11130C] text-[#E8ECDF] font-medium transition">Copy CLI Commands</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-[#282C1E] bg-[#171A10] flex items-center justify-between">
+        <button onclick="disconnectFirebase()" class="px-3 py-1.5 rounded-lg bg-red-950/60 text-red-200 hover:bg-red-700 text-xs transition">Clear Cloud Config</button>
+        <div class="flex items-center gap-2">
+          <button onclick="closeFirebaseModal()" class="px-4 py-1.5 rounded-lg bg-[#23271A] text-[#E8ECDF] text-xs">Cancel</button>
+          <button onclick="saveAndConnectFirebase()" class="px-4 py-1.5 rounded-lg bg-[#977ADC] text-[#11130C] font-bold text-xs hover:opacity-95 transition">Save &amp; Connect Firebase</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: BOARD TEMPLATES -->
+  <div id="modal-templates" class="hidden fixed inset-0 bg-[#11130C]/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#11130C] text-[#E8ECDF] border border-[#CEBE7E]/50 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+      <div class="p-4 border-b border-[#282C1E] flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-[#CEBE7E]">Willnote Spatial Templates</h3>
+          <p class="text-xs text-[#E8ECDF]/70">Add a pre-structured layout to your current board or start fresh</p>
+        </div>
+        <button onclick="closeTemplatesModal()" class="p-1.5 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/70">✕</button>
+      </div>
+      <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <button onclick="applyTemplate('moodboard')" class="p-3.5 rounded-xl bg-[#181B11] hover:bg-[#23271A] border border-[#2D3223] hover:border-[#977ADC] text-left transition group">
+          <div class="font-bold text-sm text-[#E8ECDF] group-hover:text-[#977ADC]">Creative Moodboard &amp; Palette</div>
+          <p class="text-[#E8ECDF]/65 mt-1">Includes visual art cards, Willnote 4-color swatches, direction notes, and connectors.</p>
+        </button>
+        <button onclick="applyTemplate('kanban')" class="p-3.5 rounded-xl bg-[#181B11] hover:bg-[#23271A] border border-[#2D3223] hover:border-[#CEBE7E] text-left transition group">
+          <div class="font-bold text-sm text-[#E8ECDF] group-hover:text-[#CEBE7E]">3-Column Project Roadmap</div>
+          <p class="text-[#E8ECDF]/65 mt-1">Spawns Backlog, In Progress, and Shipped vertical columns with checklists.</p>
+        </button>
+        <button onclick="applyTemplate('campaign')" class="p-3.5 rounded-xl bg-[#181B11] hover:bg-[#23271A] border border-[#2D3223] hover:border-[#977ADC] text-left transition group">
+          <div class="font-bold text-sm text-[#E8ECDF] group-hover:text-[#977ADC]">Expo &amp; Campaign Architecture</div>
+          <p class="text-[#E8ECDF]/65 mt-1">Nested sub-boards, floorplan specs, vendor outreach tasks, and flow arrows.</p>
+        </button>
+        <button onclick="applyTemplate('clear')" class="p-3.5 rounded-xl bg-[#181B11] hover:bg-red-950/40 border border-[#2D3223] hover:border-red-400 text-left transition group">
+          <div class="font-bold text-sm text-red-300">Clean Blank Board</div>
+          <p class="text-[#E8ECDF]/65 mt-1">Moves current board items to Trash so you can start with a fresh canvas.</p>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: BACKUP, EXPORT & IMPORT (.JSON / .MD) -->
+  <div id="modal-export" class="hidden fixed inset-0 bg-[#11130C]/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#11130C] text-[#E8ECDF] border border-[#CEBE7E]/40 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="p-4 border-b border-[#282C1E] flex items-center justify-between">
+        <h3 class="text-base font-bold text-[#E8ECDF]">Backup, Export &amp; Restore</h3>
+        <button onclick="closeExportModal()" class="p-1.5 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/70">✕</button>
+      </div>
+      <div class="p-4 space-y-2.5 text-xs">
+        <button onclick="exportWorkspaceJson()" class="w-full p-3 rounded-xl bg-[#181B11] hover:bg-[#23271A] border border-[#2D3223] flex items-center justify-between transition">
+          <div class="text-left">
+            <div class="font-bold text-sm text-[#CEBE7E]">Export Full Workspace (.json)</div>
+            <div class="text-[#E8ECDF]/60">Download all nested boards, cards, images, and connectors</div>
+          </div>
+          <span class="px-2.5 py-1 rounded bg-[#CEBE7E] text-[#11130C] font-bold">Download</span>
+        </button>
+
+        <button onclick="triggerJsonImport()" class="w-full p-3 rounded-xl bg-[#181B11] hover:bg-[#23271A] border border-[#2D3223] flex items-center justify-between transition">
+          <div class="text-left">
+            <div class="font-bold text-sm text-[#977ADC]">Import Workspace Backup (.json)</div>
+            <div class="text-[#E8ECDF]/60">Restore a previously saved Willnote JSON file</div>
+          </div>
+          <span class="px-2.5 py-1 rounded bg-[#977ADC] text-[#11130C] font-bold">Upload</span>
+        </button>
+
+        <button onclick="exportCurrentBoardMarkdown()" class="w-full p-3 rounded-xl bg-[#181B11] hover:bg-[#23271A] border border-[#2D3223] flex items-center justify-between transition">
+          <div class="text-left">
+            <div class="font-bold text-sm text-[#E8ECDF]">Export Active Board to Markdown (.md)</div>
+            <div class="text-[#E8ECDF]/60">Compile notes, columns, and checklists into clean Markdown</div>
+          </div>
+          <span class="px-2.5 py-1 rounded bg-[#23271A] border border-[#E8ECDF]/30 text-[#E8ECDF] font-semibold">Export .MD</span>
+        </button>
+
+        <button onclick="resetToDemoWorkspace()" class="w-full p-2.5 rounded-xl bg-[#181B11] hover:bg-[#23271A] border border-[#2D3223] text-center text-[#E8ECDF]/70 hover:text-[#CEBE7E] transition">
+          Restore Default Starter Showcase Board
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: TRASH DRAWER -->
+  <div id="modal-trash" class="hidden fixed inset-0 bg-[#11130C]/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#11130C] text-[#E8ECDF] border border-[#2D3223] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-4 border-b border-[#282C1E] flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-[#CEBE7E]">Trash Can</h3>
+          <p class="text-xs text-[#E8ECDF]/60">Restore accidentally deleted cards or empty trash permanently</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="emptyTrash()" class="px-2.5 py-1 rounded bg-red-950/80 text-red-200 hover:bg-red-700 text-xs">Empty Trash</button>
+          <button onclick="closeTrashModal()" class="p-1.5 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/70">✕</button>
+        </div>
+      </div>
+      <div id="trash-list" class="max-h-80 overflow-y-auto p-3 space-y-2 text-xs">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: FULLSCREEN IMAGE LIGHTBOX -->
+  <div id="modal-lightbox" class="hidden fixed inset-0 bg-[#11130C]/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6" onclick="closeLightbox()">
+    <img id="lightbox-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Preview" class="max-w-full max-h-[82vh] rounded-xl shadow-2xl border border-[#CEBE7E]/40 object-contain" />
+    <div id="lightbox-caption" class="mt-3 text-sm font-medium text-[#E8ECDF] bg-[#11130C]/80 px-4 py-1.5 rounded-full border border-[#2D3223]"></div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed top-16 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    /*************************************************************************
+     * WILLNOTE — COMPLETE INFINITE SPATIAL WORKSPACE ENGINE
+     * Palette: #E8ECDF (Sage) | #CEBE7E (Gold) | #11130C (Obsidian) | #977ADC (Amethyst)
+     *************************************************************************/
+
+    var STORAGE_KEY = 'willnote_workspace_v1';
+    var FIREBASE_CFG_KEY = 'willnote_firebase_config_v1';
+
+    // Default SVG illustrations (Base64 encoded data URIs so zero external image dependencies fail)
+    function createConceptArtDataUri(variant) {
+      var svg = '';
+      if (variant === 'architecture') {
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="280" viewBox="0 0 480 280">' +
+          '<rect width="480" height="280" fill="#11130C"/>' +
+          '<circle cx="380" cy="70" r="85" fill="#977ADC" opacity="0.22"/>' +
+          '<circle cx="110" cy="220" r="110" fill="#CEBE7E" opacity="0.18"/>' +
+          '<rect x="44" y="42" width="180" height="196" rx="14" fill="#E8ECDF" stroke="#CEBE7E" stroke-width="2"/>' +
+          '<rect x="64" y="66" width="140" height="18" rx="4" fill="#11130C"/>' +
+          '<rect x="64" y="96" width="96" height="10" rx="3" fill="#977ADC"/>' +
+          '<rect x="64" y="120" width="140" height="68" rx="8" fill="#CEBE7E" opacity="0.45"/>' +
+          '<rect x="260" y="68" width="176" height="150" rx="14" fill="#1C1F15" stroke="#977ADC" stroke-width="2"/>' +
+          '<path d="M285 180 L325 130 L360 162 L405 105" fill="none" stroke="#CEBE7E" stroke-width="4" stroke-linecap="round"/>' +
+          '<circle cx="405" cy="105" r="7" fill="#977ADC"/>' +
+          '<path d="M224 140 C 242 140, 242 140, 260 140" stroke="#977ADC" stroke-width="3" stroke-dasharray="5,4"/>' +
+          '</svg>';
+      } else {
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="280" viewBox="0 0 480 280">' +
+          '<rect width="480" height="280" fill="#E8ECDF"/>' +
+          '<rect x="30" y="30" width="420" height="220" rx="18" fill="#11130C"/>' +
+          '<rect x="58" y="58" width="82" height="164" rx="10" fill="#E8ECDF"/>' +
+          '<rect x="154" y="58" width="82" height="164" rx="10" fill="#CEBE7E"/>' +
+          '<rect x="250" y="58" width="82" height="164" rx="10" fill="#1C1F15" stroke="#CEBE7E"/>' +
+          '<rect x="346" y="58" width="76" height="164" rx="10" fill="#977ADC"/>' +
+          '</svg>';
+      }
+      return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function createStarterWorkspace() {
+      return {
+        currentBoardId: 'root',
+        boardPath: [{ id: 'root', title: 'Main Studio' }],
+        unsorted: [
+          { id: 'uns-1', text: 'Draft 3D stage lighting & booth layout references for upcoming expo', createdAt: 'Today' },
+          { id: 'uns-2', text: 'Test Firebase Hosting live sync across laptop and mobile browser', createdAt: 'Today' }
+        ],
+        trash: [],
+        boards: {
+          'root': {
+            id: 'root',
+            title: 'Main Studio',
+            parentId: null,
+            gridMode: 'dots',
+            snapToGrid: true,
+            panX: 60,
+            panY: 45,
+            zoom: 0.95,
+            cards: [
+              {
+                id: 'hdr-welcome',
+                type: 'header',
+                x: 40,
+                y: 16,
+                w: 580,
+                title: 'Willnote — Personal Visual Workspace',
+                subtitle: 'Unlimited cards • Nested boards • Custom Sage, Gold, Obsidian & Amethyst system',
+                theme: 'ivory',
+                z: 1,
+                locked: false
+              },
+              {
+                id: 'board-brand',
+                type: 'board',
+                x: 40,
+                y: 96,
+                w: 256,
+                title: 'Brand Identity & Visual System',
+                subtitle: 'Double-click to open nested board',
+                targetBoardId: 'sub-brand',
+                badgeColor: '#977ADC',
+                theme: 'obsidian',
+                z: 2,
+                locked: false
+              },
+              {
+                id: 'board-roadmap',
+                type: 'board',
+                x: 320,
+                y: 96,
+                w: 256,
+                title: 'Project & Expo Sprint Board',
+                subtitle: 'Double-click to open nested board',
+                targetBoardId: 'sub-roadmap',
+                badgeColor: '#CEBE7E',
+                theme: 'obsidian',
+                z: 3,
+                locked: false
+              },
+              {
+                id: 'note-guide',
+                type: 'note',
+                x: 40,
+                y: 232,
+                w: 280,
+                title: 'Quick Spatial Controls',
+                content: '<ul><li><b>Drag any tool</b> from the left dock onto the canvas, or <b>double-click</b> empty space.</li><li><b>Connect cards:</b> Drag any purple side port on a card to another card.</li><li><b>Pan &amp; Zoom:</b> Hold <code>Space + Drag</code> or use <code>Ctrl + Scroll</code>.</li><li><b>Sub-Boards:</b> Double-click a Board card to enter it, or drag cards onto a Board to move them inside!</li></ul>',
+                theme: 'ivory',
+                z: 4,
+                locked: false
+              },
+              {
+                id: 'todo-launch',
+                type: 'todo',
+                x: 344,
+                y: 232,
+                w: 272,
+                title: 'Workspace Milestones',
+                hideCompleted: false,
+                items: [
+                  { id: 't1', text: 'Apply custom 4-color palette (#E8ECDF, #CEBE7E, #11130C, #977ADC)', done: true },
+                  { id: 't2', text: 'Design custom Willnote geometric vector logo', done: true },
+                  { id: 't3', text: 'Test nested sub-boards & column drag-and-drop', done: false },
+                  { id: 't4', text: 'Connect Firebase Cloud Sync for everywhere access', done: false }
+                ],
+                theme: 'ivory',
+                z: 5,
+                locked: false
+              },
+              {
+                id: 'img-showcase',
+                type: 'image',
+                x: 40,
+                y: 472,
+                w: 280,
+                title: 'Spatial Architecture Concept',
+                src: createConceptArtDataUri('architecture'),
+                caption: 'Double-click image to view fullscreen or click Replace to upload your own.',
+                theme: 'obsidian',
+                z: 6,
+                locked: false
+              },
+              {
+                id: 'link-firebase',
+                type: 'link',
+                x: 344,
+                y: 488,
+                w: 272,
+                title: 'Firebase Hosting & Firestore Console',
+                url: 'https://console.firebase.google.com/',
+                domain: 'console.firebase.google.com',
+                description: 'Create a free web app project and paste your config into Willnote Cloud Sync.',
+                theme: 'gold',
+                z: 7,
+                locked: false
+              },
+              {
+                id: 'col-main',
+                type: 'column',
+                x: 648,
+                y: 96,
+                w: 284,
+                title: 'Creative Direction Column',
+                theme: 'sage',
+                z: 8,
+                locked: false,
+                items: [
+                  {
+                    id: 'col-item-1',
+                    type: 'note',
+                    title: 'Zero Card Limits',
+                    content: 'Unlike free-tier cloud boards capped at 100 cards, Willnote stores unlimited boards, columns, notes, and high-res moodboards.'
+                  },
+                  {
+                    id: 'col-item-2',
+                    type: 'todo',
+                    title: 'Column Tasks',
+                    items: [
+                      { id: 'ct1', text: 'Drag any canvas card into this column', done: true },
+                      { id: 'ct2', text: 'Click Pop Out (↗) to return a card to freeform canvas', done: false }
+                    ]
+                  }
+                ]
+              },
+              {
+                id: 'sw-sage',
+                type: 'swatch',
+                x: 960,
+                y: 96,
+                w: 176,
+                title: 'Alabaster Sage',
+                role: 'Canvas & Light Surface',
+                hex: '#E8ECDF',
+                theme: 'ivory',
+                z: 9,
+                locked: false
+              },
+              {
+                id: 'sw-gold',
+                type: 'swatch',
+                x: 960,
+                y: 224,
+                w: 176,
+                title: 'Antique Ochre Gold',
+                role: 'Warm Secondary Accent',
+                hex: '#CEBE7E',
+                theme: 'ivory',
+                z: 10,
+                locked: false
+              },
+              {
+                id: 'sw-obsidian',
+                type: 'swatch',
+                x: 960,
+                y: 352,
+                w: 176,
+                title: 'Obsidian Olive-Black',
+                role: 'Primary Ink & Dock',
+                hex: '#11130C',
+                theme: 'ivory',
+                z: 11,
+                locked: false
+              },
+              {
+                id: 'sw-amethyst',
+                type: 'swatch',
+                x: 960,
+                y: 480,
+                w: 176,
+                title: 'Amethyst Lavender',
+                role: 'Interactive Brand Accent',
+                hex: '#977ADC',
+                theme: 'ivory',
+                z: 12,
+                locked: false
+              }
+            ],
+            connectors: [
+              {
+                id: 'conn-1',
+                fromCardId: 'board-brand',
+                fromSide: 'bottom',
+                toCardId: 'note-guide',
+                toSide: 'top',
+                color: '#977ADC',
+                dashed: false,
+                curved: true,
+                label: 'Design System'
+              },
+              {
+                id: 'conn-2',
+                fromCardId: 'board-roadmap',
+                fromSide: 'bottom',
+                toCardId: 'todo-launch',
+                toSide: 'top',
+                color: '#CEBE7E',
+                dashed: true,
+                curved: true,
+                label: 'Active Sprint'
+              },
+              {
+                id: 'conn-3',
+                fromCardId: 'todo-launch',
+                fromSide: 'right',
+                toCardId: 'col-main',
+                toSide: 'left',
+                color: '#977ADC',
+                dashed: false,
+                curved: true,
+                label: 'Stack Flow'
+              }
+            ]
+          },
+          'sub-brand': {
+            id: 'sub-brand',
+            title: 'Brand Identity & Visual System',
+            parentId: 'root',
+            gridMode: 'dots',
+            snapToGrid: true,
+            panX: 80,
+            panY: 60,
+            zoom: 1,
+            cards: [
+              {
+                id: 'sb-hdr-1',
+                type: 'header',
+                x: 48,
+                y: 32,
+                w: 520,
+                title: 'Brand Identity & Palette Architecture',
+                subtitle: 'Inside Nested Sub-Board • Use top breadcrumbs to return to Main Studio',
+                theme: 'ivory',
+                z: 1,
+                locked: false
+              },
+              {
+                id: 'sb-img-1',
+                type: 'image',
+                x: 48,
+                y: 120,
+                w: 320,
+                title: 'Willnote Official 4-Color System',
+                src: createConceptArtDataUri('palette'),
+                caption: '#E8ECDF • #CEBE7E • #11130C • #977ADC',
+                theme: 'obsidian',
+                z: 2,
+                locked: false
+              },
+              {
+                id: 'sb-note-1',
+                type: 'note',
+                x: 400,
+                y: 120,
+                w: 290,
+                title: 'Typography & Contrast Rules',
+                content: '<blockquote>High-contrast Obsidian (#11130C) ink on warm Alabaster Sage (#E8ECDF) reduces eye strain during long creative sessions.</blockquote><p>Use Amethyst (#977ADC) for interactive focus states and Antique Gold (#CEBE7E) for warm structural highlights.</p>',
+                theme: 'gold',
+                z: 3,
+                locked: false
+              }
+            ],
+            connectors: [
+              {
+                id: 'sb-conn-1',
+                fromCardId: 'sb-img-1',
+                fromSide: 'right',
+                toCardId: 'sb-note-1',
+                toSide: 'left',
+                color: '#977ADC',
+                dashed: false,
+                curved: true,
+                label: 'Harmony'
+              }
+            ]
+          },
+          'sub-roadmap': {
+            id: 'sub-roadmap',
+            title: 'Project & Expo Sprint Board',
+            parentId: 'root',
+            gridMode: 'lines',
+            snapToGrid: true,
+            panX: 80,
+            panY: 60,
+            zoom: 1,
+            cards: [
+              {
+                id: 'sr-hdr-1',
+                type: 'header',
+                x: 48,
+                y: 32,
+                w: 520,
+                title: 'Project & Expo Sprint Execution',
+                subtitle: 'Organize deliverables, booth logistics, and creative assets',
+                theme: 'ivory',
+                z: 1,
+                locked: false
+              },
+              {
+                id: 'sr-todo-1',
+                type: 'todo',
+                x: 48,
+                y: 120,
+                w: 280,
+                title: 'Phase 1 Deliverables',
+                hideCompleted: false,
+                items: [
+                  { id: 'srt1', text: 'Finalize 3D floor plan & booth pricing matrix', done: true },
+                  { id: 'srt2', text: 'Prepare keynote visual deck & sponsor kit', done: false },
+                  { id: 'srt3', text: 'Publish landing page to Firebase Hosting', done: false }
+                ],
+                theme: 'ivory',
+                z: 2,
+                locked: false
+              },
+              {
+                id: 'sr-note-1',
+                type: 'note',
+                x: 368,
+                y: 120,
+                w: 280,
+                title: 'Key Creative Notes',
+                content: 'Use this sub-board for deep project planning. You can create additional sub-boards inside this board for infinite nesting!',
+                theme: 'amethyst',
+                z: 3,
+                locked: false
+              }
+            ],
+            connectors: [
+              {
+                id: 'sr-conn-1',
+                fromCardId: 'sr-todo-1',
+                fromSide: 'right',
+                toCardId: 'sr-note-1',
+                toSide: 'left',
+                color: '#CEBE7E',
+                dashed: true,
+                curved: true,
+                label: 'Next Step'
+              }
+            ]
+          }
+        }
+      };
+    }
+
+    // Application Runtime State
+    var state = null;
+    var historyStack = { past: [], future: [] };
+    var selectedCardIds = [];
+    var selectedConnectorId = null;
+    var interactionMode = 'select'; // 'select' | 'pan' | 'connect'
+    var isSpacePressed = false;
+    var activePointerAction = null; // pan, dragCards, resizeCard, marquee, connectPort
+    var quickSpawnCoords = { x: 200, y: 200 };
+    var pendingImageTargetCardId = null;
+    var showMinimap = true;
+
+    // Firebase Runtime Objects
+    var fbApp = null;
+    var fbDb = null;
+    var fbWorkspaceKey = 'willnote-personal-main';
+    var fbUnsubscribe = null;
+    var isApplyingRemoteUpdate = false;
+
+    // Load Workspace from Storage
+    function loadWorkspaceFromStorage() {
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && parsed.boards && parsed.boards.root) {
+            state = parsed;
+            return;
+          }
+        }
+      } catch (e) {
+        // Fallback if storage is restricted
+      }
+      state = createStarterWorkspace();
+    }
+
+    function saveWorkspaceToStorage(skipCloudPush) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        // Quota or sandbox fallback
+      }
+      if (!skipCloudPush && fbDb && !isApplyingRemoteUpdate) {
+        debouncedCloudPush();
+      }
+    }
+
+    var cloudPushTimer = null;
+    function debouncedCloudPush() {
+      if (cloudPushTimer) clearTimeout(cloudPushTimer);
+      cloudPushTimer = setTimeout(function() {
+        pushWorkspaceToFirestore(true);
+      }, 900);
+    }
+
+    function pushHistorySnapshot() {
+      try {
+        var snap = JSON.stringify({
+          currentBoardId: state.currentBoardId,
+          boardPath: state.boardPath,
+          boards: state.boards,
+          unsorted: state.unsorted,
+          trash: state.trash
+        });
+        historyStack.past.push(snap);
+        if (historyStack.past.length > 40) historyStack.past.shift();
+        historyStack.future = [];
+        updateUndoRedoButtons();
+      } catch (e) {}
+    }
+
+    function undoAction() {
+      if (historyStack.past.length === 0) {
+        showToast('Nothing to undo');
+        return;
+      }
+      try {
+        var currentSnap = JSON.stringify({
+          currentBoardId: state.currentBoardId,
+          boardPath: state.boardPath,
+          boards: state.boards,
+          unsorted: state.unsorted,
+          trash: state.trash
+        });
+        historyStack.future.push(currentSnap);
+        var prev = JSON.parse(historyStack.past.pop());
+        state.currentBoardId = prev.currentBoardId;
+        state.boardPath = prev.boardPath;
+        state.boards = prev.boards;
+        state.unsorted = prev.unsorted;
+        state.trash = prev.trash;
+        selectedCardIds = [];
+        selectedConnectorId = null;
+        saveWorkspaceToStorage();
+        renderAll();
+        updateUndoRedoButtons();
+        showToast('Undid last action');
+      } catch (e) {}
+    }
+
+    function redoAction() {
+      if (historyStack.future.length === 0) {
+        showToast('Nothing to redo');
+        return;
+      }
+      try {
+        var currentSnap = JSON.stringify({
+          currentBoardId: state.currentBoardId,
+          boardPath: state.boardPath,
+          boards: state.boards,
+          unsorted: state.unsorted,
+          trash: state.trash
+        });
+        historyStack.past.push(currentSnap);
+        var next = JSON.parse(historyStack.future.pop());
+        state.currentBoardId = next.currentBoardId;
+        state.boardPath = next.boardPath;
+        state.boards = next.boards;
+        state.unsorted = next.unsorted;
+        state.trash = next.trash;
+        selectedCardIds = [];
+        selectedConnectorId = null;
+        saveWorkspaceToStorage();
+        renderAll();
+        updateUndoRedoButtons();
+        showToast('Redid action');
+      } catch (e) {}
+    }
+
+    function updateUndoRedoButtons() {
+      var u = document.getElementById('btn-undo');
+      var r = document.getElementById('btn-redo');
+      if (u) u.disabled = historyStack.past.length === 0;
+      if (r) r.disabled = historyStack.future.length === 0;
+    }
+
+    function getCurrentBoard() {
+      if (!state.boards[state.currentBoardId]) {
+        state.currentBoardId = 'root';
+      }
+      return state.boards[state.currentBoardId];
+    }
+
+    function uid(prefix) {
+      return (prefix || 'id') + '-' + Math.random().toString(36).substring(2, 9) + '-' + Date.now().toString(36).slice(-3);
+    }
+
+    function snapVal(v) {
+      var b = getCurrentBoard();
+      if (!b.snapToGrid) return Math.round(v);
+      return Math.round(v / 16) * 16;
+    }
+
+    function screenToWorld(clientX, clientY) {
+      var vp = document.getElementById('canvas-viewport');
+      var rect = vp.getBoundingClientRect();
+      var b = getCurrentBoard();
+      return {
+        x: (clientX - rect.left - b.panX) / b.zoom,
+        y: (clientY - rect.top - b.panY) / b.zoom
+      };
+    }
+
+    /*************************************************************************
+     * RENDERING ENGINE: WORLD, BREADCRUMBS, CARDS, COLUMNS & CONNECTORS
+     *************************************************************************/
+    function renderAll() {
+      applyViewportTransform();
+      renderBreadcrumbs();
+      renderCards();
+      renderConnectors();
+      renderSelectionBar();
+      renderUnsortedDrawer();
+      renderTrashBadge();
+      renderMinimap();
+      updateBottomStatusBar();
+      updateUndoRedoButtons();
+    }
+
+    function applyViewportTransform() {
+      var b = getCurrentBoard();
+      var world = document.getElementById('canvas-world');
+      var vp = document.getElementById('canvas-viewport');
+      if (world) {
+        world.style.transform = 'translate3d(' + b.panX + 'px, ' + b.panY + 'px, 0) scale(' + b.zoom + ')';
+      }
+      if (vp) {
+        vp.classList.remove('grid-dots', 'grid-lines', 'grid-blank');
+        vp.classList.add('grid-' + (b.gridMode || 'dots'));
+        if (b.gridMode === 'dots') {
+          var sz = Math.max(12, Math.round(24 * b.zoom));
+          vp.style.backgroundSize = sz + 'px ' + sz + 'px';
+          vp.style.backgroundPosition = b.panX + 'px ' + b.panY + 'px';
+        } else if (b.gridMode === 'lines') {
+          var lsz = Math.max(16, Math.round(32 * b.zoom));
+          vp.style.backgroundSize = lsz + 'px ' + lsz + 'px';
+          vp.style.backgroundPosition = b.panX + 'px ' + b.panY + 'px';
+        } else {
+          vp.style.backgroundSize = '';
+        }
+      }
+      var zr = document.getElementById('zoom-readout');
+      if (zr) zr.textContent = Math.round(b.zoom * 100) + '%';
+    }
+
+    function renderBreadcrumbs() {
+      var nav = document.getElementById('breadcrumb-bar');
+      if (!nav) return;
+      var html = '';
+      for (var i = 0; i < state.boardPath.length; i++) {
+        var crumb = state.boardPath[i];
+        var isLast = (i === state.boardPath.length - 1);
+        if (i > 0) {
+          html += '<span class="text-[#CEBE7E]/50 mx-0.5">/</span>';
+        }
+        if (isLast) {
+          html += '<span class="px-2 py-0.5 rounded bg-[#23271A] text-[#CEBE7E] font-semibold truncate max-w-[180px]">' + escapeHtml(crumb.title) + '</span>';
+        } else {
+          html += '<button onclick="navigateToBoard(\'' + crumb.id + '\')" class="px-1.5 py-0.5 rounded hover:bg-[#23271A] text-[#E8ECDF]/75 hover:text-[#E8ECDF] transition truncate max-w-[140px]">' + escapeHtml(crumb.title) + '</button>';
+        }
+      }
+      nav.innerHTML = html;
+    }
+
+    function renderCards() {
+      var b = getCurrentBoard();
+      var container = document.getElementById('cards-layer');
+      if (!container) return;
+      var html = '';
+
+      for (var i = 0; i < b.cards.length; i++) {
+        var c = b.cards[i];
+        var isSel = selectedCardIds.indexOf(c.id) !== -1;
+        var themeClass = 'theme-' + (c.theme || 'ivory');
+        var zIndex = c.z || (i + 1);
+
+        if (c.type === 'header') {
+          html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
+            'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
+            'class="wn-card ' + (isSel ? 'selected' : '') + ' px-3 py-2 bg-transparent border border-transparent hover:border-[#11130C]/20 rounded-xl" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 460) + 'px; z-index:' + zIndex + '; box-shadow:none;">' +
+            renderCardPorts(c.id) +
+            '<div class="card-drag-handle cursor-move flex items-center justify-between mb-0.5">' +
+              '<span class="text-[10px] font-bold uppercase tracking-widest text-[#977ADC]">Section Header</span>' +
+              (c.locked ? '<span class="text-[10px] text-[#CEBE7E]">🔒</span>' : '') +
+            '</div>' +
+            '<div contenteditable="true" oninput="updateCardField(\'' + c.id + '\', \'title\', this.innerText)" onblur="updateCardField(\'' + c.id + '\', \'title\', this.innerText)" onkeydown="handleSingleLineEditableKey(event, this)" ' +
+              'class="text-2xl font-extrabold tracking-tight text-[#11130C] focus:outline-none leading-tight">' + escapeHtml(c.title || 'Section Title') + '</div>' +
+            '<div contenteditable="true" oninput="updateCardField(\'' + c.id + '\', \'subtitle\', this.innerText)" onblur="updateCardField(\'' + c.id + '\', \'subtitle\', this.innerText)" onkeydown="handleSingleLineEditableKey(event, this)" ' +
+              'class="text-xs font-medium text-[#11130C]/70 focus:outline-none mt-0.5">' + escapeHtml(c.subtitle || 'Add section description...') + '</div>' +
+            renderResizeHandle(c.id) +
+          '</div>';
+          continue;
+        }
+
+        if (c.type === 'board') {
+          var subBoard = state.boards[c.targetBoardId];
+          var itemCount = subBoard && subBoard.cards ? subBoard.cards.length : 0;
+          var badgeCol = c.badgeColor || '#977ADC';
+          html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
+            'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
+            'ondblclick="openSubBoardCard(\'' + c.id + '\')" ' +
+            'class="wn-card ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' p-3.5 cursor-pointer select-none" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 256) + 'px; z-index:' + zIndex + ';">' +
+            renderCardPorts(c.id) +
+            '<div class="flex items-start justify-between gap-2">' +
+              '<div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style="background:' + badgeCol + '; color:#11130C;">' +
+                '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>' +
+              '</div>' +
+              '<div class="flex items-center gap-1">' +
+                '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#977ADC]/20 text-[#977ADC] border border-[#977ADC]/30">' + itemCount + ' items</span>' +
+                '<button onclick="event.stopPropagation(); openSubBoardCard(\'' + c.id + '\')" class="px-2 py-0.5 rounded bg-[#CEBE7E] text-[#11130C] text-[10px] font-bold hover:opacity-90 transition" title="Enter Sub-Board">Open →</button>' +
+              '</div>' +
+            '</div>' +
+            '<div contenteditable="true" onclick="event.stopPropagation()" oninput="updateSubBoardTitle(\'' + c.id + '\', this.innerText)" onblur="updateSubBoardTitle(\'' + c.id + '\', this.innerText)" onkeydown="handleSingleLineEditableKey(event, this)" ' +
+              'class="mt-3 font-bold text-sm leading-snug focus:outline-none">' + escapeHtml(c.title || 'Untitled Board') + '</div>' +
+            '<div class="text-[11px] opacity-65 mt-0.5">Double-click or drop cards here</div>' +
+            renderResizeHandle(c.id) +
+          '</div>';
+          continue;
+        }
+
+        if (c.type === 'note') {
+          html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
+            'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
+            'class="wn-card ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' flex flex-col" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 280) + 'px; z-index:' + zIndex + ';">' +
+            renderCardPorts(c.id) +
+            '<div class="card-drag-handle px-3.5 pt-2.5 pb-1.5 border-b border-current/10 flex items-center justify-between cursor-move">' +
+              '<input type="text" value="' + escapeAttr(c.title || '') + '" placeholder="Note heading..." ' +
+                'oninput="updateCardField(\'' + c.id + '\', \'title\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'title\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                'class="bg-transparent font-bold text-sm w-full focus:outline-none" />' +
+              (c.locked ? '<span class="text-xs ml-1">🔒</span>' : '') +
+            '</div>' +
+            '<!-- Mini Rich Formatting Bar -->' +
+            '<div class="px-3 py-1 bg-black/5 flex items-center gap-1 text-[11px] opacity-75 hover:opacity-100 transition">' +
+              '<button onclick="formatNoteText(\'' + c.id + '\', \'bold\')" class="px-1.5 py-0.5 rounded hover:bg-black/10 font-bold" title="Bold">B</button>' +
+              '<button onclick="formatNoteText(\'' + c.id + '\', \'italic\')" class="px-1.5 py-0.5 rounded hover:bg-black/10 italic" title="Italic">I</button>' +
+              '<button onclick="formatNoteText(\'' + c.id + '\', \'insertUnorderedList\')" class="px-1.5 py-0.5 rounded hover:bg-black/10" title="Bullet List">• List</button>' +
+              '<button onclick="appendNoteQuote(\'' + c.id + '\')" class="px-1.5 py-0.5 rounded hover:bg-black/10" title="Add Highlight Quote">❝ Quote</button>' +
+            '</div>' +
+            '<div id="note-body-' + c.id + '" contenteditable="true" data-placeholder="Write notes, ideas, or paste text..." ' +
+              'oninput="updateCardField(\'' + c.id + '\', \'content\', this.innerHTML)" onkeyup="updateCardField(\'' + c.id + '\', \'content\', this.innerHTML)" onblur="updateCardField(\'' + c.id + '\', \'content\', this.innerHTML)" ' +
+              'class="note-editor px-3.5 py-2.5 text-xs leading-relaxed focus:outline-none min-h-[76px]">' + (c.content || '') + '</div>' +
+            renderResizeHandle(c.id) +
+          '</div>';
+          continue;
+        }
+
+        if (c.type === 'todo') {
+          var items = c.items || [];
+          var doneCount = 0;
+          for (var t = 0; t < items.length; t++) {
+            if (items[t].done) doneCount++;
+          }
+          var pct = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0;
+
+          var tasksHtml = '';
+          for (var ti = 0; ti < items.length; ti++) {
+            var item = items[ti];
+            if (c.hideCompleted && item.done) continue;
+            tasksHtml += '<div class="flex items-start gap-2 group py-1">' +
+              '<input type="checkbox" ' + (item.done ? 'checked' : '') + ' ' +
+                'onchange="toggleTodoItem(\'' + c.id + '\', \'' + item.id + '\')" ' +
+                'class="mt-0.5 w-3.5 h-3.5 rounded accent-[#977ADC] cursor-pointer shrink-0" />' +
+              '<input type="text" value="' + escapeAttr(item.text) + '" ' +
+                'oninput="updateTodoItemText(\'' + c.id + '\', \'' + item.id + '\', this.value)" onchange="updateTodoItemText(\'' + c.id + '\', \'' + item.id + '\', this.value)" onkeydown="handleTodoItemEditKey(event, \'' + c.id + '\', \'' + item.id + '\', this)" ' +
+                'class="flex-1 bg-transparent text-xs focus:outline-none ' + (item.done ? 'line-through opacity-50' : '') + '" />' +
+              '<button onclick="deleteTodoItem(\'' + c.id + '\', \'' + item.id + '\')" class="opacity-0 group-hover:opacity-80 text-[11px] text-red-400 hover:text-red-600 px-1" title="Remove Task">✕</button>' +
+            '</div>';
+          }
+
+          html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
+            'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
+            'class="wn-card ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' p-3.5 flex flex-col" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 272) + 'px; z-index:' + zIndex + ';">' +
+            renderCardPorts(c.id) +
+            '<div class="card-drag-handle flex items-center justify-between gap-2 cursor-move mb-1.5">' +
+              '<input type="text" value="' + escapeAttr(c.title || 'To-Do List') + '" ' +
+                'oninput="updateCardField(\'' + c.id + '\', \'title\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'title\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                'class="bg-transparent font-bold text-sm flex-1 focus:outline-none" />' +
+              '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#977ADC]/20 text-[#977ADC]">' + doneCount + '/' + items.length + '</span>' +
+            '</div>' +
+            '<!-- Progress Bar -->' +
+            '<div class="w-full h-1.5 bg-black/10 rounded-full overflow-hidden mb-2.5">' +
+              '<div class="h-full bg-[#977ADC] transition-all duration-300" style="width:' + pct + '%"></div>' +
+            '</div>' +
+            '<div class="space-y-0.5 mb-2">' + tasksHtml + '</div>' +
+            '<div class="flex items-center gap-1.5 pt-1.5 border-t border-current/10">' +
+              '<input id="todo-add-' + c.id + '" type="text" placeholder="+ Add a task & press Enter..." ' +
+                'onkeydown="handleNewTodoInputKey(event, \'' + c.id + '\', this)" ' +
+                'class="flex-1 bg-transparent text-xs focus:outline-none placeholder:opacity-50" />' +
+              '<button onclick="var inp=document.getElementById(\'todo-add-' + c.id + '\'); addTodoItem(\'' + c.id + '\', inp.value); inp.value=\'\';" class="px-2 py-0.5 rounded bg-[#977ADC] text-[#11130C] font-bold text-[10px]">Add</button>' +
+            '</div>' +
+            renderResizeHandle(c.id) +
+          '</div>';
+          continue;
+        }
+
+        if (c.type === 'column') {
+          var colItems = c.items || [];
+          var innerHtml = '';
+          for (var ci = 0; ci < colItems.length; ci++) {
+            var sub = colItems[ci];
+            innerHtml += '<div class="p-2.5 rounded-lg bg-[#F5F7F0] text-[#11130C] border border-[#D2D8C5] shadow-sm relative group">' +
+              '<div class="flex items-center justify-between gap-1 mb-1">' +
+                '<input type="text" value="' + escapeAttr(sub.title || 'Card') + '" ' +
+                  'oninput="updateColumnSubItemTitle(\'' + c.id + '\', \'' + sub.id + '\', this.value)" onchange="updateColumnSubItemTitle(\'' + c.id + '\', \'' + sub.id + '\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                  'class="font-bold text-xs bg-transparent flex-1 focus:outline-none" />' +
+                '<div class="flex items-center gap-1 opacity-70 group-hover:opacity-100">' +
+                  '<button onclick="popColumnItemToCanvas(\'' + c.id + '\', \'' + sub.id + '\')" class="text-[10px] px-1.5 py-0.5 rounded bg-[#CEBE7E]/40 hover:bg-[#977ADC] hover:text-[#11130C] font-semibold transition" title="Pop card out onto freeform canvas">↗ Canvas</button>' +
+                  '<button onclick="deleteColumnSubItem(\'' + c.id + '\', \'' + sub.id + '\')" class="text-[10px] px-1 text-red-500 hover:text-red-700" title="Remove">✕</button>' +
+                '</div>' +
+              '</div>';
+            if (sub.type === 'todo') {
+              var sItems = sub.items || [];
+              for (var si = 0; si < sItems.length; si++) {
+                var st = sItems[si];
+                innerHtml += '<label class="flex items-center gap-1.5 text-[11px] py-0.5 cursor-pointer">' +
+                  '<input type="checkbox" ' + (st.done ? 'checked' : '') + ' onchange="toggleColumnTodo(\'' + c.id + '\', \'' + sub.id + '\', \'' + st.id + '\')" class="accent-[#977ADC]" />' +
+                  '<span class="' + (st.done ? 'line-through opacity-50' : '') + '">' + escapeHtml(st.text) + '</span>' +
+                '</label>';
+              }
+            } else {
+              innerHtml += '<div contenteditable="true" oninput="updateColumnSubItemContent(\'' + c.id + '\', \'' + sub.id + '\', this.innerHTML)" onblur="updateColumnSubItemContent(\'' + c.id + '\', \'' + sub.id + '\', this.innerHTML)" class="text-xs text-[#11130C]/80 focus:outline-none leading-relaxed">' + (sub.content || 'Click to edit note...') + '</div>';
+            }
+            innerHtml += '</div>';
+          }
+
+          html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
+            'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
+            'class="wn-card ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' p-3 flex flex-col" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 284) + 'px; z-index:' + zIndex + ';">' +
+            renderCardPorts(c.id) +
+            '<div class="card-drag-handle flex items-center justify-between gap-2 pb-2 mb-2 border-b border-current/15 cursor-move">' +
+              '<div class="flex items-center gap-1.5 flex-1">' +
+                '<span class="w-2.5 h-2.5 rounded-sm bg-[#CEBE7E] border border-[#11130C]/30"></span>' +
+                '<input type="text" value="' + escapeAttr(c.title || 'Column') + '" ' +
+                  'oninput="updateCardField(\'' + c.id + '\', \'title\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'title\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                  'class="bg-transparent font-bold text-xs uppercase tracking-wider w-full focus:outline-none" />' +
+              '</div>' +
+              '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/10">' + colItems.length + '</span>' +
+            '</div>' +
+            '<div class="space-y-2 mb-2.5">' + innerHtml + '</div>' +
+            '<div class="flex items-center justify-between gap-1.5 pt-1 border-t border-current/10 text-[11px]">' +
+              '<button onclick="addCardInsideColumn(\'' + c.id + '\', \'note\')" class="flex-1 py-1 rounded bg-black/5 hover:bg-[#977ADC] hover:text-[#11130C] font-semibold transition">+ Add Note</button>' +
+              '<button onclick="addCardInsideColumn(\'' + c.id + '\', \'todo\')" class="flex-1 py-1 rounded bg-black/5 hover:bg-[#CEBE7E] hover:text-[#11130C] font-semibold transition">+ Add Tasks</button>' +
+            '</div>' +
+            '<div class="text-[10px] text-center opacity-55 mt-1">Drag any canvas card here to stack</div>' +
+            renderResizeHandle(c.id) +
+          '</div>';
+          continue;
+        }
+
+        if (c.type === 'image') {
+          var imgSrc = c.src || createConceptArtDataUri('architecture');
+          var showDesc = (c.showDescription !== false);
+          html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
+            'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
+            'class="wn-card ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' overflow-hidden flex flex-col cursor-move" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 280) + 'px; z-index:' + zIndex + ';">' +
+            renderCardPorts(c.id) +
+            '<div class="relative group bg-[#11130C]">' +
+              '<img src="' + imgSrc + '" alt="' + escapeAttr(c.title || 'Canvas Visual') + '" draggable="false" ondragstart="return false;" ' +
+                'ondblclick="event.stopPropagation(); openLightbox(\'' + c.id + '\')" ' +
+                'class="w-full h-auto max-h-72 object-cover block select-none pointer-events-auto" />' +
+              '<div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex items-center gap-1">' +
+                '<button onclick="event.stopPropagation(); toggleImageDescription(\'' + c.id + '\')" class="px-2 py-1 rounded bg-[#11130C]/90 text-[#E8ECDF] border border-[#977ADC]/50 text-[10px] font-semibold hover:bg-[#977ADC] hover:text-[#11130C]" title="Show or hide text/description below image">' + (showDesc ? 'Hide Text' : '+ Description') + '</button>' +
+                '<button onclick="event.stopPropagation(); triggerImageUploadForCard(\'' + c.id + '\')" class="px-2 py-1 rounded bg-[#11130C]/90 text-[#CEBE7E] border border-[#CEBE7E]/40 text-[10px] font-semibold hover:bg-[#977ADC] hover:text-[#11130C]">Upload</button>' +
+                '<button onclick="event.stopPropagation(); openLightbox(\'' + c.id + '\')" class="px-2 py-1 rounded bg-[#11130C]/90 text-[#E8ECDF] text-[10px] hover:bg-[#23271A]">Zoom</button>' +
+              '</div>' +
+            '</div>' +
+            (showDesc ? (
+              '<div class="p-3">' +
+                '<input type="text" value="' + escapeAttr(c.title || 'Visual Reference') + '" placeholder="Image title..." ' +
+                  'oninput="updateCardField(\'' + c.id + '\', \'title\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'title\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                  'class="bg-transparent font-bold text-xs w-full focus:outline-none" />' +
+                '<input type="text" value="' + escapeAttr(c.caption || '') + '" placeholder="Add description or paste image URL..." ' +
+                  'oninput="updateCardField(\'' + c.id + '\', \'caption\', this.value)" onchange="updateImageCardCaptionOrUrl(\'' + c.id + '\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                  'class="bg-transparent text-[11px] opacity-75 w-full focus:outline-none mt-0.5" />' +
+              '</div>'
+            ) : '') +
+            renderResizeHandle(c.id) +
+          '</div>';
+          continue;
+        }
+
+        if (c.type === 'link') {
+          var safeUrl = c.url || 'https://firebase.google.com';
+          html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
+            'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
+            'class="wn-card ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' p-3.5 flex flex-col" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 272) + 'px; z-index:' + zIndex + ';">' +
+            renderCardPorts(c.id) +
+            '<div class="flex items-center justify-between gap-2 mb-2">' +
+              '<div class="flex items-center gap-1.5 text-[11px] font-semibold opacity-75 truncate">' +
+                '<span class="w-5 h-5 rounded bg-[#11130C] text-[#CEBE7E] flex items-center justify-center text-[10px] font-bold">🔗</span>' +
+                '<span class="truncate">' + escapeHtml(c.domain || 'Web Bookmark') + '</span>' +
+              '</div>' +
+              '<a href="' + escapeAttr(safeUrl) + '" draggable="false" ondragstart="return false;" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="px-2 py-0.5 rounded bg-[#11130C] text-[#E8ECDF] hover:bg-[#977ADC] hover:text-[#11130C] text-[10px] font-bold transition shrink-0">Visit ↗</a>' +
+            '</div>' +
+            '<input type="text" value="' + escapeAttr(c.title || 'Bookmark Title') + '" ' +
+              'oninput="updateCardField(\'' + c.id + '\', \'title\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'title\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+              'class="bg-transparent font-bold text-sm w-full focus:outline-none" />' +
+            '<div contenteditable="true" oninput="updateCardField(\'' + c.id + '\', \'description\', this.innerText)" onblur="updateCardField(\'' + c.id + '\', \'description\', this.innerText)" ' +
+              'class="text-xs opacity-80 mt-1 focus:outline-none">' + escapeHtml(c.description || 'Add bookmark notes...') + '</div>' +
+            '<input type="text" value="' + escapeAttr(safeUrl) + '" placeholder="https://..." ' +
+              'oninput="updateCardField(\'' + c.id + '\', \'url\', this.value)" onchange="updateLinkCardUrl(\'' + c.id + '\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+              'class="mt-2 pt-1.5 border-t border-current/15 bg-transparent font-mono text-[10px] opacity-70 w-full focus:outline-none" />' +
+            renderResizeHandle(c.id) +
+          '</div>';
+          continue;
+        }
+
+        if (c.type === 'swatch') {
+          var hex = (c.hex || '#977ADC').toUpperCase();
+          html += '<div id="card-' + c.id + '" data-card-id="' + c.id + '" ' +
+            'onmousedown="onCardMouseDown(event, \'' + c.id + '\')" ' +
+            'class="wn-card ' + themeClass + ' ' + (isSel ? 'selected' : '') + ' p-2.5 flex flex-col" ' +
+            'style="left:' + c.x + 'px; top:' + c.y + 'px; width:' + (c.w || 176) + 'px; z-index:' + zIndex + ';">' +
+            renderCardPorts(c.id) +
+            '<div class="h-16 w-full rounded-lg border border-black/15 relative group overflow-hidden shadow-inner" style="background-color:' + escapeAttr(hex) + ';">' +
+              '<label class="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 group-hover:opacity-100 transition cursor-pointer text-[10px] font-bold text-white">' +
+                '<span>Pick Color</span>' +
+                '<input type="color" value="' + escapeAttr(hex) + '" onchange="updateSwatchHex(\'' + c.id + '\', this.value)" class="sr-only" />' +
+              '</label>' +
+            '</div>' +
+            '<div class="mt-2 flex items-center justify-between gap-1">' +
+              '<input type="text" value="' + escapeAttr(c.title || 'Palette Swatch') + '" ' +
+                'oninput="updateCardField(\'' + c.id + '\', \'title\', this.value)" onchange="updateCardField(\'' + c.id + '\', \'title\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                'class="bg-transparent font-bold text-xs w-full focus:outline-none" />' +
+            '</div>' +
+            '<div class="flex items-center justify-between mt-1 pt-1 border-t border-current/10">' +
+              '<span class="font-mono text-[11px] font-semibold opacity-80">' + escapeHtml(hex) + '</span>' +
+              '<button onclick="copyHexToClipboard(\'' + escapeAttr(hex) + '\')" class="px-1.5 py-0.5 rounded bg-[#11130C] text-[#CEBE7E] hover:bg-[#977ADC] hover:text-[#11130C] text-[10px] font-bold transition">Copy</button>' +
+            '</div>' +
+            renderResizeHandle(c.id) +
+          '</div>';
+          continue;
+        }
+      }
+
+      container.innerHTML = html;
+    }
+
+    function renderCardPorts(cardId) {
+      return '<div onmousedown="onPortMouseDown(event, \'' + cardId + '\', \'top\')" class="conn-port conn-port-top" title="Drag to connect"></div>' +
+             '<div onmousedown="onPortMouseDown(event, \'' + cardId + '\', \'right\')" class="conn-port conn-port-right" title="Drag to connect"></div>' +
+             '<div onmousedown="onPortMouseDown(event, \'' + cardId + '\', \'bottom\')" class="conn-port conn-port-bottom" title="Drag to connect"></div>' +
+             '<div onmousedown="onPortMouseDown(event, \'' + cardId + '\', \'left\')" class="conn-port conn-port-left" title="Drag to connect"></div>';
+    }
+
+    function renderResizeHandle(cardId) {
+      return '<div onmousedown="onResizeMouseDown(event, \'' + cardId + '\')" class="resize-handle" title="Drag to resize card width">' +
+        '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M9 1L1 9M9 5L5 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
+      '</div>';
+    }
+
+    /*************************************************************************
+     * BEZIER CONNECTOR SVG ENGINE
+     *************************************************************************/
+    function getCardPortCoordinates(card, side) {
+      var el = document.getElementById('card-' + card.id);
+      var w = card.w || 260;
+      var h = el ? el.offsetHeight : 140;
+      if (side === 'top') return { x: card.x + w / 2, y: card.y };
+      if (side === 'bottom') return { x: card.x + w / 2, y: card.y + h };
+      if (side === 'left') return { x: card.x, y: card.y + h / 2 };
+      return { x: card.x + w, y: card.y + h / 2 };
+    }
+
+    function computeBezierPath(p1, s1, p2, s2, curved) {
+      if (!curved) {
+        return 'M ' + p1.x + ' ' + p1.y + ' L ' + p2.x + ' ' + p2.y;
+      }
+      var dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      var offset = Math.min(140, Math.max(45, dist * 0.42));
+      var c1x = p1.x, c1y = p1.y, c2x = p2.x, c2y = p2.y;
+      if (s1 === 'top') c1y -= offset;
+      else if (s1 === 'bottom') c1y += offset;
+      else if (s1 === 'left') c1x -= offset;
+      else c1x += offset;
+
+      if (s2 === 'top') c2y -= offset;
+      else if (s2 === 'bottom') c2y += offset;
+      else if (s2 === 'left') c2x -= offset;
+      else c2x += offset;
+
+      return 'M ' + p1.x + ' ' + p1.y + ' C ' + c1x + ' ' + c1y + ', ' + c2x + ' ' + c2y + ', ' + p2.x + ' ' + p2.y;
+    }
+
+    function renderConnectors() {
+      var b = getCurrentBoard();
+      var g = document.getElementById('connectors-layer');
+      if (!g) return;
+      var conns = b.connectors || [];
+      var svgHtml = '';
+
+      for (var i = 0; i < conns.length; i++) {
+        var cn = conns[i];
+        var fromCard = findCardById(cn.fromCardId);
+        var toCard = findCardById(cn.toCardId);
+        if (!fromCard || !toCard) continue;
+
+        var p1 = getCardPortCoordinates(fromCard, cn.fromSide || 'right');
+        var p2 = getCardPortCoordinates(toCard, cn.toSide || 'left');
+        var d = computeBezierPath(p1, cn.fromSide || 'right', p2, cn.toSide || 'left', cn.curved !== false);
+
+        var col = cn.color || '#977ADC';
+        var markerId = 'arrow-amethyst';
+        if (col.toUpperCase() === '#CEBE7E') markerId = 'arrow-gold';
+        else if (col.toUpperCase() === '#11130C') markerId = 'arrow-obsidian';
+
+        var isSel = (selectedConnectorId === cn.id);
+        var midX = (p1.x + p2.x) / 2;
+        var midY = (p1.y + p2.y) / 2;
+
+        svgHtml += '<g class="cursor-pointer" onclick="onConnectorClick(event, \'' + cn.id + '\')">' +
+          '<!-- Invisible wide hit area -->' +
+          '<path d="' + d + '" fill="none" stroke="transparent" stroke-width="16" />' +
+          '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="' + (isSel ? '3.8' : '2.4') + '" ' +
+            (cn.dashed ? 'stroke-dasharray="7,5" class="connector-dashed"' : '') +
+            ' marker-end="url(#' + markerId + ')" />' +
+          '<foreignObject x="' + (midX - 65) + '" y="' + (midY - 13) + '" width="130" height="28" class="overflow-visible">' +
+            '<div xmlns="http://www.w3.org/1999/xhtml" class="flex justify-center">' +
+              '<input type="text" value="' + escapeAttr(cn.label || '') + '" placeholder="+ label" ' +
+                'onclick="onConnectorClick(event, \'' + cn.id + '\')" ' +
+                'oninput="updateConnectorLabel(\'' + cn.id + '\', this.value)" onchange="updateConnectorLabel(\'' + cn.id + '\', this.value)" onkeydown="handleSingleLineInputKey(event, this)" ' +
+                'class="px-2 py-0.5 rounded-full text-[10px] font-bold text-center bg-[#11130C] text-[#E8ECDF] border ' +
+                (isSel ? 'border-[#977ADC] ring-2 ring-[#977ADC]/50' : 'border-[#CEBE7E]/50') +
+                ' shadow focus:outline-none w-24 truncate" />' +
+            '</div>' +
+          '</foreignObject>' +
+        '</g>';
+      }
+
+      g.innerHTML = svgHtml;
+    }
+
+    function findCardById(cardId) {
+      var b = getCurrentBoard();
+      for (var i = 0; i < b.cards.length; i++) {
+        if (b.cards[i].id === cardId) return b.cards[i];
+      }
+      return null;
+    }
+
+    /*************************************************************************
+     * POINTER, PAN, ZOOM, DRAG, SMART GUIDES & MARQUEE INTERACTION
+     *************************************************************************/
+    function initCanvasEvents() {
+      var vp = document.getElementById('canvas-viewport');
+      var cardsLayer = document.getElementById('cards-layer');
+      if (cardsLayer) {
+        cardsLayer.addEventListener('dragstart', function(ev) {
+          ev.preventDefault();
+          return false;
+        });
+      }
+
+      // Mouse Down on Empty Canvas (Pan or Marquee Select)
+      vp.addEventListener('mousedown', function(e) {
+        if (e.target !== vp && e.target.id !== 'canvas-world' && e.target.id !== 'connections-svg') {
+          return;
+        }
+        closeQuickSpawnMenu();
+
+        var b = getCurrentBoard();
+        if (e.button === 1 || isSpacePressed || interactionMode === 'pan') {
+          activePointerAction = {
+            type: 'pan',
+            startX: e.clientX,
+            startY: e.clientY,
+            origPanX: b.panX,
+            origPanY: b.panY
+          };
+          vp.classList.add('panning-active');
+          return;
+        }
+
+        // Marquee Selection on Left Click
+        if (e.button === 0) {
+          flushActiveEditableElement();
+          if (!e.shiftKey) {
+            selectedCardIds = [];
+            selectedConnectorId = null;
+            updateSelectedCardClasses();
+            renderConnectors();
+            renderSelectionBar();
+          }
+          var rect = vp.getBoundingClientRect();
+          activePointerAction = {
+            type: 'marquee',
+            startClientX: e.clientX,
+            startClientY: e.clientY,
+            vpLeft: rect.left,
+            vpTop: rect.top
+          };
+        }
+      });
+
+      // Double-Click on Empty Canvas to Open Quick-Spawn Menu
+      vp.addEventListener('dblclick', function(e) {
+        if (e.target !== vp && e.target.id !== 'canvas-world' && e.target.id !== 'connections-svg') {
+          return;
+        }
+        var pt = screenToWorld(e.clientX, e.clientY);
+        quickSpawnCoords = { x: snapVal(pt.x), y: snapVal(pt.y) };
+        var menu = document.getElementById('quick-spawn-menu');
+        var rect = vp.getBoundingClientRect();
+        menu.style.left = Math.min(rect.width - 250, Math.max(12, e.clientX - rect.left)) + 'px';
+        menu.style.top = Math.min(rect.height - 230, Math.max(12, e.clientY - rect.top)) + 'px';
+        menu.classList.remove('hidden');
+      });
+
+      // Wheel Zoom & Two-Finger Pan
+      vp.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        var b = getCurrentBoard();
+        if (e.ctrlKey || e.metaKey) {
+          var rect = vp.getBoundingClientRect();
+          var mouseX = e.clientX - rect.left;
+          var mouseY = e.clientY - rect.top;
+          var worldX = (mouseX - b.panX) / b.zoom;
+          var worldY = (mouseY - b.panY) / b.zoom;
+
+          var factor = e.deltaY < 0 ? 1.1 : 0.9;
+          var newZoom = Math.min(2.5, Math.max(0.2, b.zoom * factor));
+          b.panX = mouseX - worldX * newZoom;
+          b.panY = mouseY - worldY * newZoom;
+          b.zoom = newZoom;
+          applyViewportTransform();
+          renderMinimap();
+          saveWorkspaceToStorage(true);
+        } else {
+          b.panX -= e.deltaX;
+          b.panY -= e.deltaY;
+          applyViewportTransform();
+          renderMinimap();
+          saveWorkspaceToStorage(true);
+        }
+      }, { passive: false });
+
+      // Global Mouse Move
+      window.addEventListener('mousemove', function(e) {
+        if (!activePointerAction) return;
+        var b = getCurrentBoard();
+
+        if (activePointerAction.type === 'pan') {
+          b.panX = activePointerAction.origPanX + (e.clientX - activePointerAction.startX);
+          b.panY = activePointerAction.origPanY + (e.clientY - activePointerAction.startY);
+          applyViewportTransform();
+          renderMinimap();
+          return;
+        }
+
+        if (activePointerAction.type === 'dragCards') {
+          var dx = (e.clientX - activePointerAction.startX) / b.zoom;
+          var dy = (e.clientY - activePointerAction.startY) / b.zoom;
+          if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+            activePointerAction.moved = true;
+          }
+
+          for (var i = 0; i < activePointerAction.items.length; i++) {
+            var item = activePointerAction.items[i];
+            var card = findCardById(item.id);
+            if (!card || card.locked) continue;
+            card.x = snapVal(item.origX + dx);
+            card.y = snapVal(item.origY + dy);
+            var el = document.getElementById('card-' + card.id);
+            if (el) {
+              el.style.left = card.x + 'px';
+              el.style.top = card.y + 'px';
+            }
+          }
+
+          renderSmartAlignmentGuides(activePointerAction.primaryId);
+          highlightDropTargetsUnderCursor(e.clientX, e.clientY, activePointerAction.primaryId);
+          renderConnectors();
+          renderMinimap();
+          return;
+        }
+
+        if (activePointerAction.type === 'resizeCard') {
+          var rdx = (e.clientX - activePointerAction.startX) / b.zoom;
+          var target = findCardById(activePointerAction.cardId);
+          if (target && !target.locked) {
+            target.w = Math.max(160, Math.min(820, snapVal(activePointerAction.origW + rdx)));
+            var cel = document.getElementById('card-' + target.id);
+            if (cel) cel.style.width = target.w + 'px';
+            renderConnectors();
+          }
+          return;
+        }
+
+        if (activePointerAction.type === 'connectPort') {
+          var pt = screenToWorld(e.clientX, e.clientY);
+          var fromCard = findCardById(activePointerAction.fromCardId);
+          if (fromCard) {
+            var p1 = getCardPortCoordinates(fromCard, activePointerAction.fromSide);
+            var d = computeBezierPath(p1, activePointerAction.fromSide, pt, 'left', true);
+            var tempPath = document.getElementById('temp-connector-path');
+            if (tempPath) {
+              tempPath.setAttribute('d', d);
+              tempPath.classList.remove('hidden');
+            }
+          }
+          return;
+        }
+
+        if (activePointerAction.type === 'marquee') {
+          var box = document.getElementById('marquee-box');
+          var x1 = Math.min(activePointerAction.startClientX, e.clientX) - activePointerAction.vpLeft;
+          var y1 = Math.min(activePointerAction.startClientY, e.clientY) - activePointerAction.vpTop;
+          var w = Math.abs(e.clientX - activePointerAction.startClientX);
+          var h = Math.abs(e.clientY - activePointerAction.startClientY);
+          box.style.left = x1 + 'px';
+          box.style.top = y1 + 'px';
+          box.style.width = w + 'px';
+          box.style.height = h + 'px';
+          box.classList.remove('hidden');
+
+          var wStart = screenToWorld(Math.min(activePointerAction.startClientX, e.clientX), Math.min(activePointerAction.startClientY, e.clientY));
+          var wEnd = screenToWorld(Math.max(activePointerAction.startClientX, e.clientX), Math.max(activePointerAction.startClientY, e.clientY));
+          selectedCardIds = [];
+          for (var cIdx = 0; cIdx < b.cards.length; cIdx++) {
+            var c = b.cards[cIdx];
+            var cw = c.w || 260;
+            var ch = 120;
+            if (c.x + cw >= wStart.x && c.x <= wEnd.x && c.y + ch >= wStart.y && c.y <= wEnd.y) {
+              selectedCardIds.push(c.id);
+            }
+          }
+          updateSelectedCardClasses();
+          renderSelectionBar();
+        }
+      });
+
+      // Global Mouse Up
+      window.addEventListener('mouseup', function(e) {
+        if (!activePointerAction) return;
+        var vpEl = document.getElementById('canvas-viewport');
+        vpEl.classList.remove('panning-active');
+        clearSmartGuides();
+
+        if (activePointerAction.type === 'dragCards') {
+          if (activePointerAction.moved) {
+            var droppedHandled = checkAndExecuteDropOnContainer(e.clientX, e.clientY, activePointerAction.primaryId);
+            if (!droppedHandled) {
+              saveWorkspaceToStorage();
+            }
+          }
+          clearDropTargetHighlights();
+        } else if (activePointerAction.type === 'resizeCard') {
+          saveWorkspaceToStorage();
+        } else if (activePointerAction.type === 'connectPort') {
+          var tempPath = document.getElementById('temp-connector-path');
+          if (tempPath) tempPath.classList.add('hidden');
+          finishPortConnectionAtCursor(e.clientX, e.clientY, activePointerAction.fromCardId, activePointerAction.fromSide);
+        } else if (activePointerAction.type === 'marquee') {
+          var box = document.getElementById('marquee-box');
+          if (box) box.classList.add('hidden');
+        } else if (activePointerAction.type === 'pan') {
+          saveWorkspaceToStorage(true);
+        }
+
+        activePointerAction = null;
+      });
+
+      // Global Paste Support (Paste URL or Image directly onto Canvas!)
+      window.addEventListener('paste', function(e) {
+        var activeTag = document.activeElement ? document.activeElement.tagName : '';
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) {
+          return;
+        }
+        var clip = e.clipboardData;
+        if (!clip) return;
+
+        // Check for pasted image file
+        if (clip.items) {
+          for (var i = 0; i < clip.items.length; i++) {
+            if (clip.items[i].type.indexOf('image') !== -1) {
+              var file = clip.items[i].getAsFile();
+              if (file) {
+                compressImageFileToDataUri(file, function(dataUri) {
+                  pushHistorySnapshot();
+                  var center = getViewportCenterWorld();
+                  getCurrentBoard().cards.push({
+                    id: uid('img'),
+                    type: 'image',
+                    x: snapVal(center.x - 140),
+                    y: snapVal(center.y - 100),
+                    w: 280,
+                    title: 'Pasted Clipboard Image',
+                    src: dataUri,
+                    caption: 'Pasted from clipboard',
+                    theme: 'obsidian',
+                    z: getNextZIndex()
+                  });
+                  saveWorkspaceToStorage();
+                  renderAll();
+                  showToast('Pasted image onto canvas');
+                });
+                return;
+              }
+            }
+          }
+        }
+
+        // Check for pasted URL or Note text
+        var text = clip.getData('text/plain');
+        if (text && text.trim()) {
+          pushHistorySnapshot();
+          var centerPt = getViewportCenterWorld();
+          var trimmed = text.trim();
+          if (/^https?:\/\//i.test(trimmed)) {
+            var domain = trimmed.replace(/^https?:\/\//i, '').split('/')[0];
+            getCurrentBoard().cards.push({
+              id: uid('lnk'),
+              type: 'link',
+              x: snapVal(centerPt.x - 135),
+              y: snapVal(centerPt.y - 60),
+              w: 272,
+              title: domain,
+              url: trimmed,
+              domain: domain,
+              description: 'Pasted web bookmark link',
+              theme: 'gold',
+              z: getNextZIndex()
+            });
+            showToast('Created Link Card from pasted URL');
+          } else {
+            getCurrentBoard().cards.push({
+              id: uid('note'),
+              type: 'note',
+              x: snapVal(centerPt.x - 140),
+              y: snapVal(centerPt.y - 60),
+              w: 280,
+              title: 'Pasted Note',
+              content: escapeHtml(trimmed),
+              theme: 'ivory',
+              z: getNextZIndex()
+            });
+            showToast('Created Note Card from clipboard');
+          }
+          saveWorkspaceToStorage();
+          renderAll();
+        }
+      });
+
+      // Keyboard Shortcuts
+      window.addEventListener('keydown', function(e) {
+        var activeTag = document.activeElement ? document.activeElement.tagName : '';
+        var isEditingText = (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable));
+
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          openSearchModal();
+          return;
+        }
+
+        if (e.key === 'Escape') {
+          closeSearchModal();
+          closeFirebaseModal();
+          closeTemplatesModal();
+          closeExportModal();
+          closeTrashModal();
+          closeLightbox();
+          closeQuickSpawnMenu();
+          if (interactionMode === 'connect') setInteractionMode('select');
+          return;
+        }
+
+        if (isEditingText) return;
+
+        if (e.code === 'Space' && !isSpacePressed) {
+          isSpacePressed = true;
+          document.getElementById('canvas-viewport').classList.add('panning');
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) redoAction();
+          else undoAction();
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          redoAction();
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          duplicateSelectedCards();
+          return;
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (selectedCardIds.length > 0 || selectedConnectorId) {
+            e.preventDefault();
+            deleteSelectedItems();
+          }
+        }
+        if (e.key.toLowerCase() === 'v') setInteractionMode('select');
+        if (e.key.toLowerCase() === 'h') setInteractionMode('pan');
+      });
+
+      window.addEventListener('keyup', function(e) {
+        if (e.code === 'Space') {
+          isSpacePressed = false;
+          if (interactionMode !== 'pan') {
+            document.getElementById('canvas-viewport').classList.remove('panning');
+          }
+        }
+      });
+    }
+
+    function onCardMouseDown(e, cardId) {
+      e.stopPropagation();
+      closeQuickSpawnMenu();
+
+      if (interactionMode === 'connect') {
+        onPortMouseDown(e, cardId, 'right');
+        return;
+      }
+
+      var targetTag = e.target.tagName;
+      var isInteractiveChild = (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'BUTTON' || targetTag === 'A' || e.target.isContentEditable);
+
+      selectedConnectorId = null;
+      if (e.shiftKey) {
+        var idx = selectedCardIds.indexOf(cardId);
+        if (idx === -1) selectedCardIds.push(cardId);
+        else selectedCardIds.splice(idx, 1);
+      } else {
+        if (selectedCardIds.indexOf(cardId) === -1) {
+          selectedCardIds = [cardId];
+        }
+      }
+      updateSelectedCardClasses();
+      renderConnectors();
+      renderSelectionBar();
+
+      if (isInteractiveChild) return;
+
+      flushActiveEditableElement();
+      pushHistorySnapshot();
+      var dragItems = [];
+      for (var i = 0; i < selectedCardIds.length; i++) {
+        var c = findCardById(selectedCardIds[i]);
+        if (c) dragItems.push({ id: c.id, origX: c.x, origY: c.y });
+      }
+
+      activePointerAction = {
+        type: 'dragCards',
+        primaryId: cardId,
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+        items: dragItems
+      };
+    }
+
+    function onResizeMouseDown(e, cardId) {
+      e.stopPropagation();
+      e.preventDefault();
+      var c = findCardById(cardId);
+      if (!c || c.locked) return;
+      pushHistorySnapshot();
+      activePointerAction = {
+        type: 'resizeCard',
+        cardId: cardId,
+        startX: e.clientX,
+        origW: c.w || 260
+      };
+    }
+
+    function onPortMouseDown(e, cardId, side) {
+      e.stopPropagation();
+      e.preventDefault();
+      activePointerAction = {
+        type: 'connectPort',
+        fromCardId: cardId,
+        fromSide: side
+      };
+    }
+
+    function finishPortConnectionAtCursor(clientX, clientY, fromCardId, fromSide) {
+      var b = getCurrentBoard();
+      var pt = screenToWorld(clientX, clientY);
+      var targetCard = null;
+
+      for (var i = b.cards.length - 1; i >= 0; i--) {
+        var c = b.cards[i];
+        if (c.id === fromCardId) continue;
+        var el = document.getElementById('card-' + c.id);
+        var w = c.w || 260;
+        var h = el ? el.offsetHeight : 140;
+        if (pt.x >= c.x - 16 && pt.x <= c.x + w + 16 && pt.y >= c.y - 16 && pt.y <= c.y + h + 16) {
+          targetCard = c;
+          break;
+        }
+      }
+
+      if (!targetCard) return;
+
+      // Determine closest side on target card
+      var fromCard = findCardById(fromCardId);
+      var toSide = 'left';
+      if (fromCard) {
+        var dx = targetCard.x - fromCard.x;
+        var dy = targetCard.y - fromCard.y;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          toSide = dx > 0 ? 'left' : 'right';
+        } else {
+          toSide = dy > 0 ? 'top' : 'bottom';
+        }
+      }
+
+      pushHistorySnapshot();
+      var newConn = {
+        id: uid('conn'),
+        fromCardId: fromCardId,
+        fromSide: fromSide,
+        toCardId: targetCard.id,
+        toSide: toSide,
+        color: '#977ADC',
+        dashed: false,
+        curved: true,
+        label: ''
+      };
+      b.connectors.push(newConn);
+      selectedConnectorId = newConn.id;
+      selectedCardIds = [];
+      if (interactionMode === 'connect') setInteractionMode('select');
+      saveWorkspaceToStorage();
+      renderAll();
+      showToast('Connected cards');
+    }
+
+    /*************************************************************************
+     * SMART ALIGNMENT GUIDES & DROP-INTO-BOARD / DROP-INTO-COLUMN
+     *************************************************************************/
+    function renderSmartAlignmentGuides(draggedId) {
+      var layer = document.getElementById('smart-guides-layer');
+      if (!layer) return;
+      var dragged = findCardById(draggedId);
+      if (!dragged) return;
+
+      var b = getCurrentBoard();
+      var html = '';
+      var threshold = 6;
+
+      for (var i = 0; i < b.cards.length; i++) {
+        var other = b.cards[i];
+        if (other.id === draggedId || selectedCardIds.indexOf(other.id) !== -1) continue;
+
+        if (Math.abs(dragged.x - other.x) <= threshold) {
+          dragged.x = other.x;
+          var minY = Math.min(dragged.y, other.y) - 30;
+          var maxY = Math.max(dragged.y, other.y) + 220;
+          html += '<div style="position:absolute; left:' + other.x + 'px; top:' + minY + 'px; width:1.5px; height:' + (maxY - minY) + 'px; background:#977ADC;"></div>';
+        }
+        if (Math.abs(dragged.y - other.y) <= threshold) {
+          dragged.y = other.y;
+          var minX = Math.min(dragged.x, other.x) - 30;
+          var maxX = Math.max(dragged.x, other.x) + 320;
+          html += '<div style="position:absolute; top:' + other.y + 'px; left:' + minX + 'px; height:1.5px; width:' + (maxX - minX) + 'px; background:#977ADC;"></div>';
+        }
+      }
+      layer.innerHTML = html;
+    }
+
+    function clearSmartGuides() {
+      var layer = document.getElementById('smart-guides-layer');
+      if (layer) layer.innerHTML = '';
+    }
+
+    function highlightDropTargetsUnderCursor(clientX, clientY, draggedId) {
+      clearDropTargetHighlights();
+      var target = findContainerCardUnderCursor(clientX, clientY, draggedId);
+      if (target) {
+        var el = document.getElementById('card-' + target.id);
+        if (el) el.classList.add('drop-target-active');
+      }
+    }
+
+    function clearDropTargetHighlights() {
+      var els = document.querySelectorAll('.drop-target-active');
+      for (var i = 0; i < els.length; i++) {
+        els[i].classList.remove('drop-target-active');
+      }
+    }
+
+    function findContainerCardUnderCursor(clientX, clientY, draggedId) {
+      var pt = screenToWorld(clientX, clientY);
+      var b = getCurrentBoard();
+      for (var i = b.cards.length - 1; i >= 0; i--) {
+        var c = b.cards[i];
+        if (c.id === draggedId || selectedCardIds.indexOf(c.id) !== -1) continue;
+        if (c.type !== 'board' && c.type !== 'column') continue;
+        var el = document.getElementById('card-' + c.id);
+        var w = c.w || 260;
+        var h = el ? el.offsetHeight : 140;
+        if (pt.x >= c.x && pt.x <= c.x + w && pt.y >= c.y && pt.y <= c.y + h) {
+          return c;
+        }
+      }
+      return null;
+    }
+
+    function checkAndExecuteDropOnContainer(clientX, clientY, draggedId) {
+      var container = findContainerCardUnderCursor(clientX, clientY, draggedId);
+      var dragged = findCardById(draggedId);
+      if (!container || !dragged) return false;
+
+      var b = getCurrentBoard();
+
+      // Case 1: Dropped onto a Nested Sub-Board -> Move Card Inside Sub-Board!
+      if (container.type === 'board' && dragged.type !== 'board') {
+        ensureSubBoardExists(container);
+        var subBoard = state.boards[container.targetBoardId];
+        b.cards = b.cards.filter(function(item) { return item.id !== dragged.id; });
+        b.connectors = b.connectors.filter(function(cn) { return cn.fromCardId !== dragged.id && cn.toCardId !== dragged.id; });
+        dragged.x = 80 + (subBoard.cards.length * 24);
+        dragged.y = 120 + (subBoard.cards.length * 24);
+        subBoard.cards.push(dragged);
+        selectedCardIds = [];
+        saveWorkspaceToStorage();
+        renderAll();
+        showToast('Moved "' + (dragged.title || 'Card') + '" into "' + container.title + '"');
+        return true;
+      }
+
+      // Case 2: Dropped onto a Vertical Column -> Stack Inside Column!
+      if (container.type === 'column' && (dragged.type === 'note' || dragged.type === 'todo')) {
+        if (!container.items) container.items = [];
+        container.items.push({
+          id: dragged.id,
+          type: dragged.type,
+          title: dragged.title || 'Card',
+          content: dragged.content || '',
+          items: dragged.items || []
+        });
+        b.cards = b.cards.filter(function(item) { return item.id !== dragged.id; });
+        b.connectors = b.connectors.filter(function(cn) { return cn.fromCardId !== dragged.id && cn.toCardId !== dragged.id; });
+        selectedCardIds = [];
+        saveWorkspaceToStorage();
+        renderAll();
+        showToast('Stacked card inside "' + container.title + '"');
+        return true;
+      }
+
+      return false;
+    }
+
+    /*************************************************************************
+     * CARD CREATION, DOCK DRAG-AND-DROP & SUB-BOARD NAVIGATION
+     *************************************************************************/
+    function getNextZIndex() {
+      var b = getCurrentBoard();
+      var maxZ = 1;
+      for (var i = 0; i < b.cards.length; i++) {
+        if ((b.cards[i].z || 1) > maxZ) maxZ = b.cards[i].z;
+      }
+      return maxZ + 1;
+    }
+
+    function getViewportCenterWorld() {
+      var vp = document.getElementById('canvas-viewport');
+      var rect = vp.getBoundingClientRect();
+      return screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    }
+
+    function buildNewCardObject(type, x, y) {
+      var z = getNextZIndex();
+      if (type === 'board') {
+        var newSubId = uid('subboard');
+        state.boards[newSubId] = {
+          id: newSubId,
+          title: 'New Sub-Board',
+          parentId: state.currentBoardId,
+          gridMode: 'dots',
+          snapToGrid: true,
+          panX: 80,
+          panY: 60,
+          zoom: 1,
+          cards: [
+            {
+              id: uid('hdr'),
+              type: 'header',
+              x: 64,
+              y: 48,
+              w: 480,
+              title: 'New Sub-Board Workspace',
+              subtitle: 'Drag tools from the left dock to build out this board',
+              theme: 'ivory',
+              z: 1
+            }
+          ],
+          connectors: []
+        };
+        return {
+          id: uid('brd'),
+          type: 'board',
+          x: x,
+          y: y,
+          w: 256,
+          title: 'New Sub-Board',
+          targetBoardId: newSubId,
+          badgeColor: '#977ADC',
+          theme: 'obsidian',
+          z: z
+        };
+      }
+      if (type === 'todo') {
+        return {
+          id: uid('todo'),
+          type: 'todo',
+          x: x,
+          y: y,
+          w: 272,
+          title: 'Action Checklist',
+          hideCompleted: false,
+          items: [
+            { id: uid('ti'), text: 'First priority item', done: false },
+            { id: uid('ti'), text: 'Second milestone item', done: false }
+          ],
+          theme: 'ivory',
+          z: z
+        };
+      }
+      if (type === 'column') {
+        return {
+          id: uid('col'),
+          type: 'column',
+          x: x,
+          y: y,
+          w: 284,
+          title: 'New Column',
+          theme: 'sage',
+          z: z,
+          items: [
+            { id: uid('ci'), type: 'note', title: 'Column Card', content: 'Drag any canvas card here or edit inline.' }
+          ]
+        };
+      }
+      if (type === 'image') {
+        return {
+          id: uid('img'),
+          type: 'image',
+          x: x,
+          y: y,
+          w: 280,
+          title: 'Visual Inspiration',
+          src: createConceptArtDataUri('architecture'),
+          caption: 'Hover and click Upload File to use your own image',
+          theme: 'obsidian',
+          z: z
+        };
+      }
+      if (type === 'link') {
+        return {
+          id: uid('lnk'),
+          type: 'link',
+          x: x,
+          y: y,
+          w: 272,
+          title: 'Design Reference Link',
+          url: 'https://firebase.google.com/docs/hosting',
+          domain: 'firebase.google.com',
+          description: 'Click Visit to open or paste any URL below.',
+          theme: 'gold',
+          z: z
+        };
+      }
+      if (type === 'swatch') {
+        var paletteChoices = ['#E8ECDF', '#CEBE7E', '#11130C', '#977ADC'];
+        var pick = paletteChoices[Math.floor(Math.random() * paletteChoices.length)];
+        return {
+          id: uid('sw'),
+          type: 'swatch',
+          x: x,
+          y: y,
+          w: 176,
+          title: 'Color Swatch',
+          hex: pick,
+          theme: 'ivory',
+          z: z
+        };
+      }
+      if (type === 'header') {
+        return {
+          id: uid('hdr'),
+          type: 'header',
+          x: x,
+          y: y,
+          w: 440,
+          title: 'New Section Header',
+          subtitle: 'Subtitle or zone description',
+          theme: 'ivory',
+          z: z
+        };
+      }
+      // Default: Rich Note Card
+      return {
+        id: uid('note'),
+        type: 'note',
+        x: x,
+        y: y,
+        w: 280,
+        title: 'Untitled Note',
+        content: 'Write your thoughts, specs, or brainstorm here...',
+        theme: 'ivory',
+        z: z
+      };
+    }
+
+    function onDockDragStart(e, cardType) {
+      e.dataTransfer.setData('text/plain', 'willnote-dock:' + cardType);
+    }
+
+    function onCanvasDragOver(e) {
+      e.preventDefault();
+    }
+
+    function onCanvasDrop(e) {
+      e.preventDefault();
+      if (activePointerAction) {
+        return;
+      }
+      var pt = screenToWorld(e.clientX, e.clientY);
+
+      var rawPayload = e.dataTransfer.getData('text/plain') || '';
+      if (rawPayload.indexOf('willnote-dock:') === 0) {
+        var cardType = rawPayload.replace('willnote-dock:', '');
+        if (!cardType) return;
+        pushHistorySnapshot();
+        var newCard = buildNewCardObject(cardType, snapVal(pt.x - 120), snapVal(pt.y - 40));
+        getCurrentBoard().cards.push(newCard);
+        selectedCardIds = [newCard.id];
+        saveWorkspaceToStorage();
+        renderAll();
+        return;
+      }
+
+      // Check if user dropped desktop image files from their OS onto the canvas
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        var file = e.dataTransfer.files[0];
+        if (file.type.indexOf('image') !== -1) {
+          compressImageFileToDataUri(file, function(dataUri) {
+            pushHistorySnapshot();
+            var imgCard = buildNewCardObject('image', snapVal(pt.x - 140), snapVal(pt.y - 90));
+            imgCard.title = file.name.replace(/\.[^/.]+$/, '');
+            imgCard.src = dataUri;
+            imgCard.showDescription = false;
+            imgCard.caption = '';
+            getCurrentBoard().cards.push(imgCard);
+            selectedCardIds = [imgCard.id];
+            saveWorkspaceToStorage();
+            renderAll();
+            showToast('Added clean image card (hover & click "+ Description" to add text)');
+          });
+          return;
+        }
+      }
+    }
+
+    function createCardFromDock(cardType) {
+      pushHistorySnapshot();
+      var center = getViewportCenterWorld();
+      var offset = (getCurrentBoard().cards.length % 6) * 20;
+      var newCard = buildNewCardObject(cardType, snapVal(center.x - 130 + offset), snapVal(center.y - 80 + offset));
+      getCurrentBoard().cards.push(newCard);
+      selectedCardIds = [newCard.id];
+      saveWorkspaceToStorage();
+      renderAll();
+      showToast('Added ' + cardType.toUpperCase() + ' card');
+    }
+
+    function spawnFromQuickMenu(cardType) {
+      pushHistorySnapshot();
+      var newCard = buildNewCardObject(cardType, quickSpawnCoords.x, quickSpawnCoords.y);
+      getCurrentBoard().cards.push(newCard);
+      selectedCardIds = [newCard.id];
+      closeQuickSpawnMenu();
+      saveWorkspaceToStorage();
+      renderAll();
+    }
+
+    function closeQuickSpawnMenu() {
+      var m = document.getElementById('quick-spawn-menu');
+      if (m) m.classList.add('hidden');
+    }
+
+    function ensureSubBoardExists(boardCard) {
+      if (!boardCard.targetBoardId) {
+        boardCard.targetBoardId = uid('subboard');
+      }
+      if (!state.boards[boardCard.targetBoardId]) {
+        state.boards[boardCard.targetBoardId] = {
+          id: boardCard.targetBoardId,
+          title: boardCard.title || 'Sub-Board',
+          parentId: state.currentBoardId,
+          gridMode: 'dots',
+          snapToGrid: true,
+          panX: 80,
+          panY: 60,
+          zoom: 1,
+          cards: [],
+          connectors: []
+        };
+      }
+    }
+
+    function openSubBoardCard(cardId) {
+      var card = findCardById(cardId);
+      if (!card || card.type !== 'board') return;
+      ensureSubBoardExists(card);
+      state.currentBoardId = card.targetBoardId;
+      state.boardPath.push({ id: card.targetBoardId, title: card.title || 'Sub-Board' });
+      selectedCardIds = [];
+      selectedConnectorId = null;
+      saveWorkspaceToStorage();
+      renderAll();
+    }
+
+    function navigateToBoard(boardId) {
+      if (!state.boards[boardId]) return;
+      state.currentBoardId = boardId;
+      var newPath = [];
+      for (var i = 0; i < state.boardPath.length; i++) {
+        newPath.push(state.boardPath[i]);
+        if (state.boardPath[i].id === boardId) break;
+      }
+      if (newPath.length === 0 || newPath[newPath.length - 1].id !== boardId) {
+        newPath = [{ id: 'root', title: state.boards.root.title || 'Main Studio' }];
+        if (boardId !== 'root') {
+          newPath.push({ id: boardId, title: state.boards[boardId].title || 'Sub-Board' });
+        }
+      }
+      state.boardPath = newPath;
+      selectedCardIds = [];
+      selectedConnectorId = null;
+      saveWorkspaceToStorage();
+      renderAll();
+    }
+
+    function updateSubBoardTitle(cardId, newTitle) {
+      var c = findCardById(cardId);
+      if (!c) return;
+      c.title = newTitle.trim() || 'Untitled Board';
+      if (c.targetBoardId && state.boards[c.targetBoardId]) {
+        state.boards[c.targetBoardId].title = c.title;
+      }
+      saveWorkspaceToStorage();
+      renderBreadcrumbs();
+    }
+
+    /*************************************************************************
+     * CARD FIELD UPDATES, TO-DOS, COLUMNS, IMAGES & SWATCHES
+     *************************************************************************/
+    function flushActiveEditableElement() {
+      var act = document.activeElement;
+      if (act && (act.tagName === 'INPUT' || act.tagName === 'TEXTAREA' || act.isContentEditable)) {
+        try {
+          act.dispatchEvent(new Event('input', { bubbles: true }));
+          act.dispatchEvent(new Event('change', { bubbles: true }));
+          act.blur();
+        } catch (err) {}
+      }
+    }
+
+    function handleSingleLineInputKey(e, inputEl) {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        setTimeout(function() {
+          try {
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+            inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+            inputEl.blur();
+          } catch (err) {}
+        }, 0);
+      }
+    }
+
+    function handleSingleLineEditableKey(e, editableEl) {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        setTimeout(function() {
+          try {
+            editableEl.dispatchEvent(new Event('input', { bubbles: true }));
+            editableEl.blur();
+          } catch (err) {}
+        }, 0);
+      }
+    }
+
+    function handleTodoItemEditKey(e, cardId, itemId, inputEl) {
+      if (e.isComposing || e.keyCode === 229) return;
+      updateTodoItemText(cardId, itemId, inputEl.value);
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        setTimeout(function() {
+          updateTodoItemText(cardId, itemId, inputEl.value);
+          inputEl.blur();
+        }, 0);
+      }
+    }
+
+    function handleNewTodoInputKey(e, cardId, inputEl) {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        setTimeout(function() {
+          var val = inputEl.value;
+          if (val && val.trim()) {
+            addTodoItem(cardId, val);
+            inputEl.value = '';
+          }
+        }, 0);
+      }
+    }
+
+    function updateCardField(cardId, field, value) {
+      var c = findCardById(cardId);
+      if (!c) return;
+      c[field] = value;
+      saveWorkspaceToStorage();
+      renderMinimap();
+    }
+
+    function formatNoteText(cardId, command) {
+      var editor = document.getElementById('note-body-' + cardId);
+      if (!editor) return;
+      editor.focus();
+      document.execCommand(command, false, null);
+      updateCardField(cardId, 'content', editor.innerHTML);
+    }
+
+    function appendNoteQuote(cardId) {
+      var c = findCardById(cardId);
+      if (!c) return;
+      c.content = (c.content || '') + '<blockquote>Key insight or callout...</blockquote>';
+      saveWorkspaceToStorage();
+      renderCards();
+    }
+
+    function toggleTodoItem(cardId, itemId) {
+      var c = findCardById(cardId);
+      if (!c || !c.items) return;
+      for (var i = 0; i < c.items.length; i++) {
+        if (c.items[i].id === itemId) {
+          c.items[i].done = !c.items[i].done;
+          break;
+        }
+      }
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+    }
+
+    function updateTodoItemText(cardId, itemId, newText) {
+      var c = findCardById(cardId);
+      if (!c || !c.items) return;
+      for (var i = 0; i < c.items.length; i++) {
+        if (c.items[i].id === itemId) {
+          c.items[i].text = newText;
+          break;
+        }
+      }
+      saveWorkspaceToStorage();
+    }
+
+    function addTodoItem(cardId, text) {
+      if (!text || !text.trim()) return;
+      var c = findCardById(cardId);
+      if (!c) return;
+      if (!c.items) c.items = [];
+      c.items.push({ id: uid('ti'), text: text.trim(), done: false });
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+    }
+
+    function deleteTodoItem(cardId, itemId) {
+      var c = findCardById(cardId);
+      if (!c || !c.items) return;
+      c.items = c.items.filter(function(it) { return it.id !== itemId; });
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+    }
+
+    // Column Sub-Item Actions
+    function addCardInsideColumn(colId, subType) {
+      var col = findCardById(colId);
+      if (!col) return;
+      pushHistorySnapshot();
+      if (!col.items) col.items = [];
+      if (subType === 'todo') {
+        col.items.push({
+          id: uid('coltodo'),
+          type: 'todo',
+          title: 'Checklist',
+          items: [{ id: uid('cti'), text: 'Action item', done: false }]
+        });
+      } else {
+        col.items.push({
+          id: uid('colnote'),
+          type: 'note',
+          title: 'Column Note',
+          content: 'Write details here...'
+        });
+      }
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+    }
+
+    function updateColumnSubItemTitle(colId, subId, val) {
+      var col = findCardById(colId);
+      if (!col || !col.items) return;
+      for (var i = 0; i < col.items.length; i++) {
+        if (col.items[i].id === subId) col.items[i].title = val;
+      }
+      saveWorkspaceToStorage();
+    }
+
+    function updateColumnSubItemContent(colId, subId, val) {
+      var col = findCardById(colId);
+      if (!col || !col.items) return;
+      for (var i = 0; i < col.items.length; i++) {
+        if (col.items[i].id === subId) col.items[i].content = val;
+      }
+      saveWorkspaceToStorage();
+    }
+
+    function toggleColumnTodo(colId, subId, taskId) {
+      var col = findCardById(colId);
+      if (!col || !col.items) return;
+      for (var i = 0; i < col.items.length; i++) {
+        if (col.items[i].id === subId && col.items[i].items) {
+          for (var j = 0; j < col.items[i].items.length; j++) {
+            if (col.items[i].items[j].id === taskId) {
+              col.items[i].items[j].done = !col.items[i].items[j].done;
+            }
+          }
+        }
+      }
+      saveWorkspaceToStorage();
+      renderCards();
+    }
+
+    function popColumnItemToCanvas(colId, subId) {
+      var col = findCardById(colId);
+      if (!col || !col.items) return;
+      pushHistorySnapshot();
+      var target = null;
+      col.items = col.items.filter(function(item) {
+        if (item.id === subId) {
+          target = item;
+          return false;
+        }
+        return true;
+      });
+      if (!target) return;
+      getCurrentBoard().cards.push({
+        id: uid(target.type || 'note'),
+        type: target.type || 'note',
+        x: snapVal(col.x + (col.w || 284) + 28),
+        y: snapVal(col.y),
+        w: 272,
+        title: target.title || 'Card',
+        content: target.content || '',
+        items: target.items || [],
+        theme: 'ivory',
+        z: getNextZIndex()
+      });
+      saveWorkspaceToStorage();
+      renderAll();
+      showToast('Popped card out to freeform canvas');
+    }
+
+    function deleteColumnSubItem(colId, subId) {
+      var col = findCardById(colId);
+      if (!col || !col.items) return;
+      col.items = col.items.filter(function(item) { return item.id !== subId; });
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+    }
+
+    // Image Upload & Compression
+    function triggerImageUploadForCard(cardId) {
+      pendingImageTargetCardId = cardId;
+      var inp = document.getElementById('hidden-image-input');
+      if (inp) {
+        inp.value = '';
+        inp.click();
+      }
+    }
+
+    function handleImageFileSelected(e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file || !pendingImageTargetCardId) return;
+      var targetId = pendingImageTargetCardId;
+      compressImageFileToDataUri(file, function(dataUri) {
+        var c = findCardById(targetId);
+        if (c) {
+          pushHistorySnapshot();
+          c.src = dataUri;
+          c.title = file.name.replace(/\.[^/.]+$/, '');
+          saveWorkspaceToStorage();
+          renderCards();
+          renderConnectors();
+          showToast('Updated card image');
+        }
+      });
+    }
+
+    function compressImageFileToDataUri(file, callback) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var img = new Image();
+        img.onload = function() {
+          var maxDim = 960;
+          var w = img.width;
+          var h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          callback(canvas.toDataURL('image/jpeg', 0.84));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function updateImageCardCaptionOrUrl(cardId, val) {
+      var c = findCardById(cardId);
+      if (!c) return;
+      if (/^(https?:\/\/|data:image\/)/i.test(val.trim())) {
+        c.src = val.trim();
+        c.caption = 'External image URL';
+        saveWorkspaceToStorage();
+        renderCards();
+      } else {
+        c.caption = val;
+        saveWorkspaceToStorage();
+      }
+    }
+
+    function toggleImageDescription(cardId) {
+      var c = findCardById(cardId);
+      if (!c || c.type !== 'image') return;
+      pushHistorySnapshot();
+      c.showDescription = (c.showDescription === false) ? true : false;
+      saveWorkspaceToStorage();
+      renderCards();
+      renderConnectors();
+      showToast(c.showDescription ? 'Enabled image description' : 'Hidden image text (clean image mode)');
+    }
+
+    function toggleSelectedImagesDescription() {
+      if (selectedCardIds.length === 0) return;
+      pushHistorySnapshot();
+      var toggledAny = false;
+      for (var i = 0; i < selectedCardIds.length; i++) {
+        var c = findCardById(selectedCardIds[i]);
+        if (c && c.type === 'image') {
+          c.showDescription = (c.showDescription === false) ? true : false;
+          toggledAny = true;
+        }
+      }
+      if (toggledAny) {
+        saveWorkspaceToStorage();
+        renderCards();
+        renderConnectors();
+        showToast('Toggled description bar on selected image(s)');
+      }
+    }
+
+    function openLightbox(cardId) {
+      var c = findCardById(cardId);
+      if (!c || !c.src) return;
+      document.getElementById('lightbox-img').src = c.src;
+      document.getElementById('lightbox-caption').textContent = (c.title || 'Image') + (c.caption ? ' — ' + c.caption : '');
+      document.getElementById('modal-lightbox').classList.remove('hidden');
+    }
+
+    function closeLightbox() {
+      document.getElementById('modal-lightbox').classList.add('hidden');
+    }
+
+    function updateLinkCardUrl(cardId, newUrl) {
+      var c = findCardById(cardId);
+      if (!c) return;
+      var trimmed = newUrl.trim();
+      if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+        trimmed = 'https://' + trimmed;
+      }
+      c.url = trimmed;
+      c.domain = trimmed.replace(/^https?:\/\//i, '').split('/')[0] || 'Web Link';
+      saveWorkspaceToStorage();
+      renderCards();
+    }
+
+    function updateSwatchHex(cardId, newHex) {
+      var c = findCardById(cardId);
+      if (!c) return;
+      c.hex = newHex.toUpperCase();
+      saveWorkspaceToStorage();
+      renderCards();
+    }
+
+    function copyHexToClipboard(hex) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(hex).then(function() {
+          showToast('Copied ' + hex + ' to clipboard');
+        }).catch(function() {
+          fallbackCopyText(hex);
+        });
+      } else {
+        fallbackCopyText(hex);
+      }
+    }
+
+    function fallbackCopyText(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('Copied ' + text);
+      } catch (e) {}
+      document.body.removeChild(ta);
+    }
+
+    /*************************************************************************
+     * CONTEXTUAL SELECTION TOOLBAR & CONNECTOR ACTIONS
+     *************************************************************************/
+    function updateSelectedCardClasses() {
+      var allEls = document.querySelectorAll('.wn-card');
+      for (var i = 0; i < allEls.length; i++) {
+        var cid = allEls[i].getAttribute('data-card-id');
+        if (selectedCardIds.indexOf(cid) !== -1) {
+          allEls[i].classList.add('selected');
+        } else {
+          allEls[i].classList.remove('selected');
+        }
+      }
+    }
+
+    function renderSelectionBar() {
+      var bar = document.getElementById('context-selection-bar');
+      var countLbl = document.getElementById('selection-count-label');
+      var cardSwatches = document.getElementById('card-color-swatches');
+      var connControls = document.getElementById('connector-style-controls');
+      var groupBtn = document.getElementById('btn-group-column');
+      var imgDescBtn = document.getElementById('btn-toggle-img-desc');
+
+      if (selectedCardIds.length === 0 && !selectedConnectorId) {
+        bar.classList.add('hidden');
+        bar.classList.remove('flex');
+        return;
+      }
+
+      bar.classList.remove('hidden');
+      bar.classList.add('flex');
+
+      if (selectedConnectorId) {
+        countLbl.textContent = 'Connector Line';
+        cardSwatches.classList.add('hidden');
+        connControls.classList.remove('hidden');
+        connControls.classList.add('flex');
+        groupBtn.classList.add('hidden');
+        if (imgDescBtn) { imgDescBtn.classList.add('hidden'); imgDescBtn.classList.remove('flex'); }
+      } else {
+        countLbl.textContent = selectedCardIds.length + (selectedCardIds.length === 1 ? ' card' : ' cards');
+        cardSwatches.classList.remove('hidden');
+        connControls.classList.add('hidden');
+        connControls.classList.remove('flex');
+        groupBtn.classList.remove('hidden');
+        var hasImageSelected = false;
+        for (var si = 0; si < selectedCardIds.length; si++) {
+          var sc = findCardById(selectedCardIds[si]);
+          if (sc && sc.type === 'image') { hasImageSelected = true; break; }
+        }
+        if (imgDescBtn) {
+          imgDescBtn.classList.toggle('hidden', !hasImageSelected);
+          imgDescBtn.classList.toggle('flex', hasImageSelected);
+        }
+      }
+    }
+
+    function setSelectedCardsTheme(themeName) {
+      if (selectedCardIds.length === 0) return;
+      pushHistorySnapshot();
+      for (var i = 0; i < selectedCardIds.length; i++) {
+        var c = findCardById(selectedCardIds[i]);
+        if (c) c.theme = themeName;
+      }
+      saveWorkspaceToStorage();
+      renderCards();
+    }
+
+    function groupSelectedIntoColumn() {
+      if (selectedCardIds.length === 0) return;
+      pushHistorySnapshot();
+      var b = getCurrentBoard();
+      var firstCard = findCardById(selectedCardIds[0]);
+      var colX = firstCard ? firstCard.x : 200;
+      var colY = firstCard ? firstCard.y : 160;
+      var colItems = [];
+      var remainingCards = [];
+
+      for (var i = 0; i < b.cards.length; i++) {
+        var c = b.cards[i];
+        if (selectedCardIds.indexOf(c.id) !== -1 && (c.type === 'note' || c.type === 'todo')) {
+          colItems.push({
+            id: c.id,
+            type: c.type,
+            title: c.title || 'Card',
+            content: c.content || '',
+            items: c.items || []
+          });
+        } else {
+          remainingCards.push(c);
+        }
+      }
+
+      if (colItems.length === 0) {
+        showToast('Select Note or To-Do cards to stack into a Column');
+        return;
+      }
+
+      var newCol = {
+        id: uid('col'),
+        type: 'column',
+        x: colX,
+        y: colY,
+        w: 284,
+        title: 'Grouped Column',
+        theme: 'sage',
+        z: getNextZIndex(),
+        items: colItems
+      };
+      remainingCards.push(newCol);
+      b.cards = remainingCards;
+      selectedCardIds = [newCol.id];
+      saveWorkspaceToStorage();
+      renderAll();
+      showToast('Stacked ' + colItems.length + ' cards into a Column');
+    }
+
+    function duplicateSelectedCards() {
+      if (selectedCardIds.length === 0) return;
+      pushHistorySnapshot();
+      var b = getCurrentBoard();
+      var newSel = [];
+      for (var i = 0; i < selectedCardIds.length; i++) {
+        var orig = findCardById(selectedCardIds[i]);
+        if (!orig) continue;
+        var copy = JSON.parse(JSON.stringify(orig));
+        copy.id = uid(orig.type);
+        copy.x = snapVal(orig.x + 28);
+        copy.y = snapVal(orig.y + 28);
+        copy.z = getNextZIndex();
+        b.cards.push(copy);
+        newSel.push(copy.id);
+      }
+      selectedCardIds = newSel;
+      saveWorkspaceToStorage();
+      renderAll();
+      showToast('Duplicated ' + newSel.length + ' card(s)');
+    }
+
+    function toggleLockSelectedCards() {
+      if (selectedCardIds.length === 0) return;
+      for (var i = 0; i < selectedCardIds.length; i++) {
+        var c = findCardById(selectedCardIds[i]);
+        if (c) c.locked = !c.locked;
+      }
+      saveWorkspaceToStorage();
+      renderCards();
+      showToast('Toggled card position lock');
+    }
+
+    function bringSelectedToFront() {
+      for (var i = 0; i < selectedCardIds.length; i++) {
+        var c = findCardById(selectedCardIds[i]);
+        if (c) c.z = getNextZIndex();
+      }
+      saveWorkspaceToStorage();
+      renderCards();
+    }
+
+    function deleteSelectedItems() {
+      var b = getCurrentBoard();
+      pushHistorySnapshot();
+      if (selectedConnectorId) {
+        b.connectors = b.connectors.filter(function(cn) { return cn.id !== selectedConnectorId; });
+        selectedConnectorId = null;
+        saveWorkspaceToStorage();
+        renderAll();
+        showToast('Removed connector line');
+        return;
+      }
+
+      if (selectedCardIds.length === 0) return;
+      var kept = [];
+      for (var i = 0; i < b.cards.length; i++) {
+        var c = b.cards[i];
+        if (selectedCardIds.indexOf(c.id) !== -1) {
+          state.trash.unshift({
+            card: c,
+            boardId: state.currentBoardId,
+            deletedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+        } else {
+          kept.push(c);
+        }
+      }
+      b.cards = kept;
+      b.connectors = b.connectors.filter(function(cn) {
+        return selectedCardIds.indexOf(cn.fromCardId) === -1 && selectedCardIds.indexOf(cn.toCardId) === -1;
+      });
+      var count = selectedCardIds.length;
+      selectedCardIds = [];
+      saveWorkspaceToStorage();
+      renderAll();
+      showToast('Moved ' + count + ' item(s) to Trash');
+    }
+
+    function onConnectorClick(e, connId) {
+      e.stopPropagation();
+      selectedConnectorId = connId;
+      selectedCardIds = [];
+      updateSelectedCardClasses();
+      renderConnectors();
+      renderSelectionBar();
+    }
+
+    function updateConnectorLabel(connId, val) {
+      var b = getCurrentBoard();
+      for (var i = 0; i < b.connectors.length; i++) {
+        if (b.connectors[i].id === connId) {
+          b.connectors[i].label = val;
+          break;
+        }
+      }
+      saveWorkspaceToStorage();
+    }
+
+    function setSelectedConnectorColor(hex) {
+      if (!selectedConnectorId) return;
+      var b = getCurrentBoard();
+      for (var i = 0; i < b.connectors.length; i++) {
+        if (b.connectors[i].id === selectedConnectorId) {
+          b.connectors[i].color = hex;
+          break;
+        }
+      }
+      saveWorkspaceToStorage();
+      renderConnectors();
+    }
+
+    function toggleSelectedConnectorDash() {
+      if (!selectedConnectorId) return;
+      var b = getCurrentBoard();
+      for (var i = 0; i < b.connectors.length; i++) {
+        if (b.connectors[i].id === selectedConnectorId) {
+          b.connectors[i].dashed = !b.connectors[i].dashed;
+          break;
+        }
+      }
+      saveWorkspaceToStorage();
+      renderConnectors();
+    }
+
+    function toggleSelectedConnectorCurve() {
+      if (!selectedConnectorId) return;
+      var b = getCurrentBoard();
+      for (var i = 0; i < b.connectors.length; i++) {
+        if (b.connectors[i].id === selectedConnectorId) {
+          b.connectors[i].curved = (b.connectors[i].curved === false) ? true : false;
+          break;
+        }
+      }
+      saveWorkspaceToStorage();
+      renderConnectors();
+    }
+
+    /*************************************************************************
+     * CANVAS CONTROLS: INTERACTION MODES, GRID, SNAP, ZOOM & MINIMAP RADAR
+     *************************************************************************/
+    function setInteractionMode(mode) {
+      interactionMode = mode;
+      var vp = document.getElementById('canvas-viewport');
+      var btnSel = document.getElementById('btn-mode-select');
+      var btnPan = document.getElementById('btn-mode-pan');
+      var btnConn = document.getElementById('btn-dock-connect');
+
+      vp.classList.remove('panning', 'connecting-mode');
+      btnSel.className = 'px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/80 transition';
+      btnPan.className = 'px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/80 transition';
+      btnConn.classList.remove('border-[#977ADC]', 'bg-[#23271A]');
+
+      if (mode === 'pan') {
+        vp.classList.add('panning');
+        btnPan.className = 'px-2 py-1 rounded-lg bg-[#977ADC] text-[#11130C] font-semibold transition';
+      } else if (mode === 'connect') {
+        vp.classList.add('connecting-mode');
+        btnConn.classList.add('border-[#977ADC]', 'bg-[#23271A]');
+        showToast('Connect Mode: Drag from any card to another card');
+      } else {
+        btnSel.className = 'px-2 py-1 rounded-lg bg-[#977ADC] text-[#11130C] font-semibold transition';
+      }
+    }
+
+    function toggleConnectMode() {
+      if (interactionMode === 'connect') setInteractionMode('select');
+      else setInteractionMode('connect');
+    }
+
+    function cycleGridMode() {
+      var b = getCurrentBoard();
+      var modes = ['dots', 'lines', 'blank'];
+      var nextIdx = (modes.indexOf(b.gridMode || 'dots') + 1) % modes.length;
+      b.gridMode = modes[nextIdx];
+      document.getElementById('btn-grid-toggle').textContent = 'Grid: ' + b.gridMode.charAt(0).toUpperCase() + b.gridMode.slice(1);
+      saveWorkspaceToStorage();
+      applyViewportTransform();
+    }
+
+    function toggleSnapToGrid() {
+      var b = getCurrentBoard();
+      b.snapToGrid = !b.snapToGrid;
+      var btn = document.getElementById('btn-snap-toggle');
+      btn.textContent = 'Snap: ' + (b.snapToGrid ? 'ON' : 'OFF');
+      btn.className = b.snapToGrid
+        ? 'px-2 py-1 rounded-lg bg-[#23271A] text-[#E8ECDF] transition'
+        : 'px-2 py-1 rounded-lg hover:bg-[#23271A] text-[#E8ECDF]/50 transition';
+      saveWorkspaceToStorage();
+    }
+
+    function zoomByStep(delta) {
+      var b = getCurrentBoard();
+      var vp = document.getElementById('canvas-viewport');
+      var rect = vp.getBoundingClientRect();
+      var cx = rect.width / 2;
+      var cy = rect.height / 2;
+      var wx = (cx - b.panX) / b.zoom;
+      var wy = (cy - b.panY) / b.zoom;
+      var newZoom = Math.min(2.5, Math.max(0.2, Math.round((b.zoom + delta) * 100) / 100));
+      b.panX = cx - wx * newZoom;
+      b.panY = cy - wy * newZoom;
+      b.zoom = newZoom;
+      saveWorkspaceToStorage(true);
+      applyViewportTransform();
+      renderMinimap();
+    }
+
+    function resetZoom() {
+      var b = getCurrentBoard();
+      b.zoom = 1;
+      saveWorkspaceToStorage(true);
+      applyViewportTransform();
+      renderMinimap();
+    }
+
+    function fitAllCardsToViewport() {
+      var b = getCurrentBoard();
+      if (!b.cards || b.cards.length === 0) {
+        b.panX = 80;
+        b.panY = 60;
+        b.zoom = 1;
+        applyViewportTransform();
+        renderMinimap();
+        return;
+      }
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (var i = 0; i < b.cards.length; i++) {
+        var c = b.cards[i];
+        minX = Math.min(minX, c.x);
+        minY = Math.min(minY, c.y);
+        maxX = Math.max(maxX, c.x + (c.w || 260));
+        maxY = Math.max(maxY, c.y + 200);
+      }
+      var vp = document.getElementById('canvas-viewport');
+      var rect = vp.getBoundingClientRect();
+      var pad = 80;
+      var contentW = Math.max(400, maxX - minX + pad * 2);
+      var contentH = Math.max(300, maxY - minY + pad * 2);
+      var newZoom = Math.min(1.25, Math.max(0.25, Math.min(rect.width / contentW, rect.height / contentH)));
+      b.zoom = Math.round(newZoom * 100) / 100;
+      b.panX = Math.round((rect.width - (maxX - minX) * b.zoom) / 2 - minX * b.zoom);
+      b.panY = Math.round((rect.height - (maxY - minY) * b.zoom) / 2 - minY * b.zoom);
+      saveWorkspaceToStorage(true);
+      applyViewportTransform();
+      renderMinimap();
+    }
+
+    function toggleMinimap() {
+      showMinimap = !showMinimap;
+      var mc = document.getElementById('minimap-container');
+      if (mc) mc.classList.toggle('hidden', !showMinimap);
+    }
+
+    function renderMinimap() {
+      if (!showMinimap) return;
+      var b = getCurrentBoard();
+      var itemsEl = document.getElementById('minimap-items');
+      var vpRect = document.getElementById('minimap-viewport-rect');
+      var coordsEl = document.getElementById('minimap-coords');
+      if (!itemsEl || !vpRect) return;
+
+      var scale = 0.06; // 2000px world -> 120px radar
+      var offsetX = 16;
+      var offsetY = 10;
+      var html = '';
+
+      for (var i = 0; i < b.cards.length; i++) {
+        var c = b.cards[i];
+        var mx = Math.round(c.x * scale + offsetX);
+        var my = Math.round(c.y * scale + offsetY);
+        var mw = Math.max(6, Math.round((c.w || 240) * scale));
+        var mh = c.type === 'column' ? 18 : 10;
+        var col = c.type === 'board' ? '#977ADC' : (c.type === 'column' ? '#CEBE7E' : '#E8ECDF');
+        html += '<div style="position:absolute; left:' + mx + 'px; top:' + my + 'px; width:' + mw + 'px; height:' + mh + 'px; background:' + col + '; border-radius:2px; opacity:0.85;"></div>';
+      }
+      itemsEl.innerHTML = html;
+
+      var vp = document.getElementById('canvas-viewport');
+      var rect = vp ? vp.getBoundingClientRect() : { width: 1000, height: 700 };
+      var vx = (-b.panX / b.zoom) * scale + offsetX;
+      var vy = (-b.panY / b.zoom) * scale + offsetY;
+      var vw = (rect.width / b.zoom) * scale;
+      var vh = (rect.height / b.zoom) * scale;
+
+      vpRect.style.left = Math.max(0, Math.min(150, vx)) + 'px';
+      vpRect.style.top = Math.max(0, Math.min(72, vy)) + 'px';
+      vpRect.style.width = Math.min(160, Math.max(18, vw)) + 'px';
+      vpRect.style.height = Math.min(76, Math.max(12, vh)) + 'px';
+
+      if (coordsEl) {
+        coordsEl.textContent = Math.round(-b.panX / b.zoom) + ', ' + Math.round(-b.panY / b.zoom);
+      }
+    }
+
+    function onMinimapClick(e) {
+      var b = getCurrentBoard();
+      var radar = document.getElementById('minimap-canvas');
+      var rect = radar.getBoundingClientRect();
+      var clickX = e.clientX - rect.left;
+      var clickY = e.clientY - rect.top;
+      var scale = 0.06;
+      var worldX = (clickX - 16) / scale;
+      var worldY = (clickY - 10) / scale;
+      var vp = document.getElementById('canvas-viewport').getBoundingClientRect();
+      b.panX = Math.round(vp.width / 2 - worldX * b.zoom);
+      b.panY = Math.round(vp.height / 2 - worldY * b.zoom);
+      saveWorkspaceToStorage(true);
+      applyViewportTransform();
+      renderMinimap();
+    }
+
+    function updateBottomStatusBar() {
+      var b = getCurrentBoard();
+      var pill = document.getElementById('board-stats-pill');
+      if (pill) {
+        var totalBoards = Object.keys(state.boards).length;
+        pill.textContent = b.cards.length + ' cards • ' + (b.connectors ? b.connectors.length : 0) + ' links • ' + totalBoards + ' boards';
+      }
+    }
+
+    /*************************************************************************
+     * UNSORTED QUICK-CAPTURE INBOX DRAWER & TRASH CAN
+     *************************************************************************/
+    function toggleUnsortedDrawer() {
+      var d = document.getElementById('unsorted-drawer');
+      if (d.classList.contains('hidden')) {
+        d.classList.remove('hidden');
+        d.classList.add('flex');
+        renderUnsortedDrawer();
+      } else {
+        d.classList.add('hidden');
+        d.classList.remove('flex');
+      }
+    }
+
+    function renderUnsortedDrawer() {
+      var badge = document.getElementById('unsorted-count-badge');
+      var list = document.getElementById('unsorted-list');
+      var items = state.unsorted || [];
+      if (badge) badge.textContent = items.length;
+      if (!list) return;
+
+      if (items.length === 0) {
+        list.innerHTML = '<div class="text-center py-8 text-xs text-[#E8ECDF]/40">Your quick inbox is clear.</div>';
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        html += '<div class="p-3 rounded-xl bg-[#181B11] border border-[#2D3223] space-y-2">' +
+          '<div class="text-xs text-[#E8ECDF] leading-relaxed">' + escapeHtml(it.text) + '</div>' +
+          '<div class="flex items-center justify-between pt-1 border-t border-[#282C1E] text-[10px]">' +
+            '<span class="text-[#CEBE7E]/70">' + escapeHtml(it.createdAt || 'Saved') + '</span>' +
+            '<div class="flex items-center gap-1.5">' +
+              '<button onclick="sendUnsortedToCanvas(\'' + it.id + '\')" class="px-2 py-0.5 rounded bg-[#977ADC] text-[#11130C] font-bold hover:opacity-90">← To Board</button>' +
+              '<button onclick="deleteUnsortedItem(\'' + it.id + '\')" class="px-1.5 py-0.5 rounded bg-[#23271A] text-red-300 hover:bg-red-800">✕</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }
+      list.innerHTML = html;
+    }
+
+    function addUnsortedItem() {
+      var inp = document.getElementById('unsorted-input');
+      if (!inp || !inp.value.trim()) return;
+      state.unsorted.unshift({
+        id: uid('uns'),
+        text: inp.value.trim(),
+        createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+      inp.value = '';
+      saveWorkspaceToStorage();
+      renderUnsortedDrawer();
+      showToast('Saved thought to Inbox');
+    }
+
+    function sendUnsortedToCanvas(unsId) {
+      var target = null;
+      state.unsorted = state.unsorted.filter(function(it) {
+        if (it.id === unsId) {
+          target = it;
+          return false;
+        }
+        return true;
+      });
+      if (!target) return;
+      pushHistorySnapshot();
+      var center = getViewportCenterWorld();
+      var newCard = buildNewCardObject('note', snapVal(center.x - 130), snapVal(center.y - 60));
+      newCard.title = 'From Quick Inbox';
+      newCard.content = escapeHtml(target.text);
+      getCurrentBoard().cards.push(newCard);
+      selectedCardIds = [newCard.id];
+      saveWorkspaceToStorage();
+      renderAll();
+      showToast('Placed Inbox note onto current board');
+    }
+
+    function deleteUnsortedItem(unsId) {
+      state.unsorted = state.unsorted.filter(function(it) { return it.id !== unsId; });
+      saveWorkspaceToStorage();
+      renderUnsortedDrawer();
+    }
+
+    // Trash Modal
+    function renderTrashBadge() {
+      var badge = document.getElementById('trash-count-badge');
+      if (!badge) return;
+      var count = (state.trash || []).length;
+      badge.textContent = count;
+      if (count > 0) {
+        badge.classList.remove('hidden');
+        badge.classList.add('flex');
+      } else {
+        badge.classList.add('hidden');
+        badge.classList.remove('flex');
+      }
+    }
+
+    function openTrashModal() {
+      var list = document.getElementById('trash-list');
+      var items = state.trash || [];
+      if (items.length === 0) {
+        list.innerHTML = '<div class="text-center py-8 text-[#E8ECDF]/50">Trash is empty.</div>';
+      } else {
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+          var t = items[i];
+          html += '<div class="p-3 rounded-xl bg-[#181B11] border border-[#2D3223] flex items-center justify-between gap-2">' +
+            '<div>' +
+              '<div class="font-bold text-sm text-[#E8ECDF]">' + escapeHtml(t.card.title || t.card.type.toUpperCase()) + '</div>' +
+              '<div class="text-[11px] text-[#CEBE7E]/70">Type: ' + escapeHtml(t.card.type) + ' • Deleted at ' + escapeHtml(t.deletedAt || '') + '</div>' +
+            '</div>' +
+            '<button onclick="restoreTrashItem(' + i + ')" class="px-3 py-1 rounded-lg bg-[#977ADC] text-[#11130C] font-bold hover:opacity-90">Restore</button>' +
+          '</div>';
+        }
+        list.innerHTML = html;
+      }
+      document.getElementById('modal-trash').classList.remove('hidden');
+    }
+
+    function closeTrashModal() {
+      document.getElementById('modal-trash').classList.add('hidden');
+    }
+
+    function restoreTrashItem(index) {
+      var item = state.trash[index];
+      if (!item) return;
+      state.trash.splice(index, 1);
+      var targetBoard = state.boards[item.boardId] || getCurrentBoard();
+      targetBoard.cards.push(item.card);
+      saveWorkspaceToStorage();
+      renderAll();
+      openTrashModal();
+      showToast('Restored "' + (item.card.title || 'Card') + '"');
+    }
+
+    function emptyTrash() {
+      state.trash = [];
+      saveWorkspaceToStorage();
+      renderTrashBadge();
+      openTrashModal();
+      showToast('Emptied Trash');
+    }
+
+    /*************************************************************************
+     * GLOBAL SEARCH & COMMAND PALETTE (Ctrl+K)
+     *************************************************************************/
+    function openSearchModal() {
+      var modal = document.getElementById('modal-search');
+      var inp = document.getElementById('search-query-input');
+      modal.classList.remove('hidden');
+      inp.value = '';
+      renderSearchResults();
+      setTimeout(function() { inp.focus(); }, 30);
+    }
+
+    function closeSearchModal() {
+      document.getElementById('modal-search').classList.add('hidden');
+    }
+
+    function renderSearchResults() {
+      var q = (document.getElementById('search-query-input').value || '').toLowerCase().trim();
+      var list = document.getElementById('search-results-list');
+      var results = [];
+
+      var boardIds = Object.keys(state.boards);
+      for (var bIdx = 0; bIdx < boardIds.length; bIdx++) {
+        var b = state.boards[boardIds[bIdx]];
+        for (var cIdx = 0; cIdx < b.cards.length; cIdx++) {
+          var c = b.cards[cIdx];
+          var hay = ((c.title || '') + ' ' + (c.subtitle || '') + ' ' + (c.content || '') + ' ' + (c.hex || '') + ' ' + (c.domain || '')).toLowerCase();
+          if (!q || hay.indexOf(q) !== -1) {
+            results.push({ boardId: b.id, boardTitle: b.title, card: c });
+          }
+        }
+      }
+
+      if (results.length === 0) {
+        list.innerHTML = '<div class="p-6 text-center text-xs text-[#E8ECDF]/50">No matching cards found across your boards.</div>';
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < Math.min(25, results.length); i++) {
+        var r = results[i];
+        html += '<button onclick="jumpToSearchResult(\'' + r.boardId + '\', \'' + r.card.id + '\')" class="w-full p-2.5 hover:bg-[#23271A] rounded-xl flex items-center justify-between text-left transition">' +
+          '<div class="min-w-0 pr-3">' +
+            '<div class="font-bold text-xs text-[#E8ECDF] truncate">' + escapeHtml(r.card.title || r.card.type.toUpperCase()) + '</div>' +
+            '<div class="text-[11px] text-[#CEBE7E] truncate">Board: ' + escapeHtml(r.boardTitle) + ' • Type: ' + escapeHtml(r.card.type) + '</div>' +
+          '</div>' +
+          '<span class="text-[10px] px-2 py-0.5 rounded bg-[#977ADC]/20 text-[#977ADC] font-semibold shrink-0">Jump →</span>' +
+        '</button>';
+      }
+      list.innerHTML = html;
+    }
+
+    function jumpToSearchResult(boardId, cardId) {
+      closeSearchModal();
+      navigateToBoard(boardId);
+      var card = findCardById(cardId);
+      if (!card) return;
+      var b = getCurrentBoard();
+      var vp = document.getElementById('canvas-viewport').getBoundingClientRect();
+      b.zoom = 1;
+      b.panX = Math.round(vp.width / 2 - (card.x + (card.w || 260) / 2));
+      b.panY = Math.round(vp.height / 2 - (card.y + 80));
+      selectedCardIds = [card.id];
+      saveWorkspaceToStorage(true);
+      renderAll();
+    }
+
+    /*************************************************************************
+     * TEMPLATES, EXPORT / IMPORT (.JSON & .MD)
+     *************************************************************************/
+    function openTemplatesModal() {
+      document.getElementById('modal-templates').classList.remove('hidden');
+    }
+    function closeTemplatesModal() {
+      document.getElementById('modal-templates').classList.add('hidden');
+    }
+
+    function applyTemplate(tplName) {
+      pushHistorySnapshot();
+      var b = getCurrentBoard();
+      if (tplName === 'clear') {
+        for (var i = 0; i < b.cards.length; i++) {
+          state.trash.unshift({ card: b.cards[i], boardId: b.id, deletedAt: 'Template Clear' });
+        }
+        b.cards = [];
+        b.connectors = [];
+        closeTemplatesModal();
+        saveWorkspaceToStorage();
+        renderAll();
+        showToast('Cleared board (previous items saved in Trash)');
+        return;
+      }
+
+      var baseX = 80;
+      var baseY = b.cards.length > 0 ? 640 : 80;
+
+      if (tplName === 'moodboard') {
+        var imgId = uid('img');
+        var noteId = uid('note');
+        b.cards.push(
+          { id: uid('hdr'), type: 'header', x: baseX, y: baseY, w: 500, title: 'Creative Moodboard & Visual Direction', subtitle: 'Curated references, textures, and color harmony', theme: 'ivory', z: getNextZIndex() },
+          { id: imgId, type: 'image', x: baseX, y: baseY + 84, w: 300, title: 'Key Visual Direction', src: createConceptArtDataUri('palette'), caption: 'Primary palette balance & contrast study', theme: 'obsidian', z: getNextZIndex() },
+          { id: noteId, type: 'note', x: baseX + 332, y: baseY + 84, w: 280, title: 'Art Direction Notes', content: '<ul><li>Warm Alabaster Sage surface (#E8ECDF)</li><li>Antique Ochre Gold highlights (#CEBE7E)</li><li>Deep Obsidian typography (#11130C)</li><li>Vibrant Amethyst accents (#977ADC)</li></ul>', theme: 'gold', z: getNextZIndex() },
+          { id: uid('sw'), type: 'swatch', x: baseX + 640, y: baseY + 84, w: 170, title: 'Primary Accent', hex: '#977ADC', theme: 'ivory', z: getNextZIndex() },
+          { id: uid('sw'), type: 'swatch', x: baseX + 640, y: baseY + 216, w: 170, title: 'Secondary Gold', hex: '#CEBE7E', theme: 'ivory', z: getNextZIndex() }
+        );
+        b.connectors.push({ id: uid('conn'), fromCardId: imgId, fromSide: 'right', toCardId: noteId, toSide: 'left', color: '#977ADC', dashed: false, curved: true, label: 'Palette Spec' });
+      } else if (tplName === 'kanban') {
+        b.cards.push(
+          { id: uid('hdr'), type: 'header', x: baseX, y: baseY, w: 520, title: 'Project Sprint Columns', subtitle: 'Drag cards between columns or pop them out onto the canvas', theme: 'ivory', z: getNextZIndex() },
+          { id: uid('col'), type: 'column', x: baseX, y: baseY + 84, w: 276, title: '1. Backlog & Ideas', theme: 'sage', z: getNextZIndex(), items: [{ id: uid('ci'), type: 'note', title: 'Research & Discovery', content: 'Gather visual benchmarks and technical specs.' }] },
+          { id: uid('col'), type: 'column', x: baseX + 304, y: baseY + 84, w: 276, title: '2. In Progress', theme: 'gold', z: getNextZIndex(), items: [{ id: uid('ci'), type: 'todo', title: 'Active Sprint', items: [{ id: uid('ti'), text: 'Build interactive prototype', done: true }, { id: uid('ti'), text: 'Review with stakeholders', done: false }] }] },
+          { id: uid('col'), type: 'column', x: baseX + 608, y: baseY + 84, w: 276, title: '3. Completed & Shipped', theme: 'ivory', z: getNextZIndex(), items: [{ id: uid('ci'), type: 'note', title: 'Initial Architecture', content: 'Approved and deployed.' }] }
+        );
+      } else if (tplName === 'campaign') {
+        var b1 = buildNewCardObject('board', baseX, baseY + 84);
+        b1.title = 'Venue & Booth Floorplan';
+        var t1 = buildNewCardObject('todo', baseX + 300, baseY + 84);
+        t1.title = 'Campaign Launch Checklist';
+        b.cards.push(
+          { id: uid('hdr'), type: 'header', x: baseX, y: baseY, w: 520, title: 'Expo & Campaign Master Plan', subtitle: 'End-to-end event & marketing command center', theme: 'ivory', z: getNextZIndex() },
+          b1,
+          t1
+        );
+        b.connectors.push({ id: uid('conn'), fromCardId: b1.id, fromSide: 'right', toCardId: t1.id, toSide: 'left', color: '#CEBE7E', dashed: true, curved: true, label: 'Execution' });
+      }
+
+      closeTemplatesModal();
+      saveWorkspaceToStorage();
+      renderAll();
+      fitAllCardsToViewport();
+      showToast('Added "' + tplName.toUpperCase() + '" template to board');
+    }
+
+    function openExportModal() {
+      document.getElementById('modal-export').classList.remove('hidden');
+    }
+    function closeExportModal() {
+      document.getElementById('modal-export').classList.add('hidden');
+    }
+
+    function exportWorkspaceJson() {
+      var dataStr = JSON.stringify(state, null, 2);
+      downloadBlobFile(dataStr, 'willnote-workspace-backup.json', 'application/json');
+      closeExportModal();
+      showToast('Downloaded full workspace JSON backup');
+    }
+
+    function triggerJsonImport() {
+      var inp = document.getElementById('hidden-json-input');
+      if (inp) {
+        inp.value = '';
+        inp.click();
+      }
+    }
+
+    function handleJsonImportSelected(e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          var parsed = JSON.parse(ev.target.result);
+          if (parsed && parsed.boards && parsed.boards.root) {
+            pushHistorySnapshot();
+            state = parsed;
+            saveWorkspaceToStorage();
+            closeExportModal();
+            renderAll();
+            showToast('Restored workspace backup');
+          } else {
+            showToast('Invalid Willnote backup file');
+          }
+        } catch (err) {
+          showToast('Failed to parse JSON file');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function exportCurrentBoardMarkdown() {
+      var b = getCurrentBoard();
+      var lines = ['# ' + (b.title || 'Willnote Board'), ''];
+      for (var i = 0; i < b.cards.length; i++) {
+        var c = b.cards[i];
+        lines.push('## ' + (c.title || c.type.toUpperCase()) + ' (' + c.type + ')');
+        if (c.subtitle) lines.push('*' + c.subtitle + '*');
+        if (c.content) lines.push(c.content.replace(/<[^>]+>/g, ''));
+        if (c.url) lines.push('- URL: ' + c.url);
+        if (c.hex) lines.push('- Swatch Hex: `' + c.hex + '`');
+        if (c.items && c.items.length > 0) {
+          for (var j = 0; j < c.items.length; j++) {
+            var it = c.items[j];
+            if (c.type === 'todo') {
+              lines.push('- [' + (it.done ? 'x' : ' ') + '] ' + it.text);
+            } else {
+              lines.push('- **' + (it.title || 'Item') + '**: ' + (it.content || ''));
+            }
+          }
+        }
+        lines.push('');
+      }
+      downloadBlobFile(lines.join('\n'), (b.title || 'willnote-board').toLowerCase().replace(/\s+/g, '-') + '.md', 'text/markdown');
+      closeExportModal();
+      showToast('Exported current board as Markdown');
+    }
+
+    function resetToDemoWorkspace() {
+      pushHistorySnapshot();
+      state = createStarterWorkspace();
+      selectedCardIds = [];
+      selectedConnectorId = null;
+      saveWorkspaceToStorage();
+      closeExportModal();
+      renderAll();
+      showToast('Restored starter showcase workspace');
+    }
+
+    function downloadBlobFile(content, filename, mimeType) {
+      var blob = new Blob([content], { type: mimeType });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    /*************************************************************************
+     * FIREBASE CLOUD SYNC & HOSTING DEPLOYMENT SUITE
+     *************************************************************************/
+    function openFirebaseModal() {
+      try {
+        var savedCfg = localStorage.getItem(FIREBASE_CFG_KEY);
+        if (savedCfg) {
+          var parsed = JSON.parse(savedCfg);
+          document.getElementById('firebase-config-input').value = JSON.stringify(parsed.config, null, 2);
+          document.getElementById('firebase-workspace-key').value = parsed.workspaceKey || 'willnote-personal-main';
+        }
+      } catch (e) {}
+      document.getElementById('modal-firebase').classList.remove('hidden');
+    }
+
+    function closeFirebaseModal() {
+      document.getElementById('modal-firebase').classList.add('hidden');
+    }
+
+    function saveAndConnectFirebase() {
+      var rawCfg = document.getElementById('firebase-config-input').value.trim();
+      var wsKey = document.getElementById('firebase-workspace-key').value.trim() || 'willnote-personal-main';
+      if (!rawCfg) {
+        showToast('Paste your Firebase project config JSON first');
+        return;
+      }
+
+      try {
+        // Support pasting either strict JSON or JS object snippet
+        var normalized = rawCfg
+          .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":')
+          .replace(/'/g, '"');
+        var cfg = JSON.parse(normalized);
+        if (!cfg.apiKey || !cfg.projectId) {
+          showToast('Config must include apiKey and projectId');
+          return;
+        }
+        fbWorkspaceKey = wsKey;
+        try {
+          localStorage.setItem(FIREBASE_CFG_KEY, JSON.stringify({ config: cfg, workspaceKey: wsKey }));
+        } catch (e) {}
+        initFirebaseConnection(cfg, wsKey, true);
+      } catch (err) {
+        showToast('Could not parse Firebase config JSON');
+      }
+    }
+
+    function initFirebaseConnection(cfg, wsKey, showNotification) {
+      if (typeof firebase === 'undefined') {
+        showToast('Firebase SDK not loaded; running in Offline-First mode');
+        return;
+      }
+      try {
+        if (! firebase.apps.length) {
+          fbApp = firebase.initializeApp(cfg);
+        } else {
+          fbApp = firebase.app();
+        }
+        fbDb = firebase.firestore();
+        fbWorkspaceKey = wsKey || 'willnote-personal-main';
+
+        // Sign in anonymously if needed so Firestore security rules with auth!=null work seamlessly
+        if (firebase.auth) {
+          firebase.auth().signInAnonymously().catch(function() {});
+        }
+
+        // Subscribe to real-time updates
+        if (fbUnsubscribe) fbUnsubscribe();
+        fbUnsubscribe = fbDb.collection('willnote_workspaces').doc(fbWorkspaceKey)
+          .onSnapshot(function(docSnap) {
+            if (docSnap.exists) {
+              var data = docSnap.data();
+              if (data && data.payload) {
+                try {
+                  var remoteState = JSON.parse(data.payload);
+                  if (remoteState && remoteState.boards) {
+                    isApplyingRemoteUpdate = true;
+                    state = remoteState;
+                    saveWorkspaceToStorage(true);
+                    renderAll();
+                    isApplyingRemoteUpdate = false;
+                  }
+                } catch (e) {}
+              }
+            } else {
+              pushWorkspaceToFirestore(true);
+            }
+            setCloudStatusUI(true, 'Cloud Synced (' + fbWorkspaceKey + ')');
+          }, function(err) {
+            setCloudStatusUI(false, 'Local Saved (Cloud Offline)');
+          });
+
+        if (showNotification) {
+          showToast('Connected to Firebase Firestore (' + fbWorkspaceKey + ')');
+          closeFirebaseModal();
+        }
+      } catch (e) {
+        setCloudStatusUI(false, 'Local Saved');
+        if (showNotification) showToast('Firebase connection error: check config');
+      }
+    }
+
+    function pushWorkspaceToFirestore(silent) {
+      if (!fbDb) {
+        if (!silent) showToast('Configure Firebase first to push to cloud');
+        return;
+      }
+      try {
+        fbDb.collection('willnote_workspaces').doc(fbWorkspaceKey).set({
+          payload: JSON.stringify(state),
+          updatedAt: Date.now()
+        }).then(function() {
+          setCloudStatusUI(true, 'Cloud Synced');
+          if (!silent) showToast('Pushed workspace to Firebase Cloud');
+        }).catch(function() {
+          if (!silent) showToast('Cloud push failed — check Firestore rules');
+        });
+      } catch (e) {}
+    }
+
+    function manualCloudPush() {
+      pushWorkspaceToFirestore(false);
+    }
+
+    function manualCloudPull() {
+      if (!fbDb) {
+        showToast('Connect Firebase config first');
+        return;
+      }
+      fbDb.collection('willnote_workspaces').doc(fbWorkspaceKey).get().then(function(doc) {
+        if (doc.exists && doc.data().payload) {
+          state = JSON.parse(doc.data().payload);
+          saveWorkspaceToStorage(true);
+          renderAll();
+          showToast('Pulled latest workspace from Firebase');
+        } else {
+          showToast('No cloud document found for key "' + fbWorkspaceKey + '"');
+        }
+      }).catch(function() {
+        showToast('Failed to pull from Firestore');
+      });
+    }
+
+    function disconnectFirebase() {
+      if (fbUnsubscribe) {
+        fbUnsubscribe();
+        fbUnsubscribe = null;
+      }
+      fbDb = null;
+      try {
+        localStorage.removeItem(FIREBASE_CFG_KEY);
+      } catch (e) {}
+      document.getElementById('firebase-config-input').value = '';
+      setCloudStatusUI(false, 'Local Saved');
+      showToast('Disconnected Firebase Cloud Sync');
+      closeFirebaseModal();
+    }
+
+    function setCloudStatusUI(isCloud, labelText) {
+      var dot = document.getElementById('sync-status-dot');
+      var txt = document.getElementById('sync-status-text');
+      var modalStatus = document.getElementById('firebase-modal-status');
+      if (dot) {
+        dot.className = isCloud ? 'w-2 h-2 rounded-full bg-[#977ADC]' : 'w-2 h-2 rounded-full bg-[#CEBE7E]';
+      }
+      if (txt) txt.textContent = labelText;
+      if (modalStatus) {
+        modalStatus.textContent = isCloud
+          ? 'Connected to Cloud Firestore document "' + fbWorkspaceKey + '". Changes sync automatically.'
+          : 'Offline-First Local Storage Active (Auto-saving every change in browser storage).';
+      }
+    }
+
+    function downloadFirebaseJsonConfig() {
+      var fbHostingJson = JSON.stringify({
+        hosting: {
+          public: "public",
+          ignore: ["firebase.json", "**/.*", "**/node_modules/**"],
+          rewrites: [{ source: "**", destination: "/index.html" }]
+        }
+      }, null, 2);
+      downloadBlobFile(fbHostingJson, 'firebase.json', 'application/json');
+      showToast('Downloaded firebase.json');
+    }
+
+    function copyDeployCommands() {
+      var cmds = 'npm install -g firebase-tools && firebase login && firebase init hosting && firebase deploy --only hosting';
+      copyHexToClipboard(cmds);
+    }
+
+    /*************************************************************************
+     * UTILITIES & TOAST NOTIFICATIONS
+     *************************************************************************/
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function escapeAttr(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function showToast(message) {
+      var container = document.getElementById('toast-container');
+      if (!container) return;
+      var toast = document.createElement('div');
+      toast.className = 'px-3.5 py-2 rounded-xl bg-[#11130C] text-[#E8ECDF] border border-[#977ADC] shadow-xl text-xs font-medium flex items-center gap-2 transition-all duration-300';
+      toast.innerHTML = '<span class="w-2 h-2 rounded-full bg-[#977ADC]"></span><span>' + escapeHtml(message) + '</span>';
+      container.appendChild(toast);
+      setTimeout(function() {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-6px)';
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 280);
+      }, 2400);
+    }
+
+    // Boot Application
+    window.onload = function() {
+      loadWorkspaceFromStorage();
+      initCanvasEvents();
+      renderAll();
+
+      // Auto-reconnect Firebase if config was previously saved
+      try {
+        var saved = localStorage.getItem(FIREBASE_CFG_KEY);
+        if (saved) {
+          var parsed = JSON.parse(saved);
+          if (parsed && parsed.config && parsed.config.apiKey) {
+            initFirebaseConnection(parsed.config, parsed.workspaceKey, false);
+          }
+        }
+      } catch (e) {}
+    };
+  </script>
+</body>
+</html>
